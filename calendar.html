@@ -4,10 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>首頁 | 裁判出勤系統</title>
+    <title>行事曆 | 裁判出勤系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
+    <!-- FullCalendar 主程式 -->
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
+    
+    <!-- rrule 函式庫（必要） -->
+    <script src="https://cdn.jsdelivr.net/npm/rrule@2.7.1/dist/es5/rrule.min.js"></script>
+    
+    <!-- FullCalendar 的 rrule 插件 -->
+    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/rrule@6.1.8/index.global.min.js"></script>
 </head>
 
 <body
@@ -29,7 +39,7 @@
                 <div id="profile-info" class="text-xl font-bold leading-snug text-blue-800"></div>
                 <h2 id="welcome-title" class="text-2xl sm:text-3xl font-bold mb-1">您好!</h2>
             </div>
-        
+
             <div class="flex flex-col sm:w-1/4 w-full items-center gap-3">
                 <a href="change_password.html" id="change-pwd-btn"
                     class="w-full px-5 py-2 rounded-xl bg-white border-2 border-blue-400 text-blue-800 font-semibold hover:bg-blue-100 transition shadow-sm text-center">
@@ -43,44 +53,19 @@
         </div>
 
         <div
-            class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-xl mx-auto">
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto mb-10">
-                <!-- 通用功能 -->
-                <a href="attendance.html"
-                    class="flex items-center gap-3 px-5 py-4 rounded-xl bg-blue-100 border border-blue-300 text-blue-900 font-semibold text-lg hover:bg-blue-200 transition shadow">
-                    <i class="fas fa-calendar-plus text-xl"></i> 出勤報名 / 修改
+            class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-5xl mx-auto min-h-auto sm:min-h-auto">
+            <div id="calendar" class="w-full sm:max-w-4xl mx-auto mt-6 
+                        text-[12px] sm:text-base 
+                        [&_.fc-event-title]:whitespace-normal 
+                        [&_.fc-event-title]:break-words">
+            </div>
+
+
+            <div class="flex justify-center mt-4" id="back-button">
+                <a href="main.html"
+                    class="text-center py-2 px-6 rounded-xl border-2 border-blue-600 text-blue-900 font-semibold hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-500 hover:text-white transition">
+                    <i class="fas fa-arrow-left me-2"></i>返回首頁
                 </a>
-                <a href="#"
-                    class="flex items-center gap-3 px-5 py-4 rounded-xl bg-blue-100 border border-blue-300 text-blue-900 font-semibold text-lg hover:bg-blue-200 transition shadow">
-                    <i class="fas fa-table text-xl"></i> 班表查詢
-                </a>
-                <a href="calendar.html"
-                    class="flex items-center gap-3 px-5 py-4 rounded-xl bg-blue-100 border border-blue-300 text-blue-900 font-semibold text-lg hover:bg-blue-200 transition shadow">
-                    <i class="fas fa-calendar-alt text-xl"></i> 行事曆
-                </a>
-                <a href="#"
-                    class="flex items-center gap-3 px-5 py-4 rounded-xl bg-blue-100 border border-blue-300 text-blue-900 font-semibold text-lg hover:bg-blue-200 transition shadow">
-                    <i class="fas fa-book text-xl"></i> 競賽規則
-                </a>
-                <a href="#"
-                    class="flex items-center gap-3 px-5 py-4 rounded-xl bg-blue-100 border border-blue-300 text-blue-900 font-semibold text-lg hover:bg-blue-200 transition shadow">
-                    <i class="fas fa-map-marker-alt text-xl"></i> 球場交通資訊
-                </a>
-                <a href="#"
-                    class="flex items-center gap-3 px-5 py-4 rounded-xl bg-blue-100 border border-blue-300 text-blue-900 font-semibold text-lg hover:bg-blue-200 transition shadow">
-                    <i class="fas fa-chalkboard-teacher text-xl"></i> 講習 & 進修資訊
-                </a>
-                <!-- 僅限管理員的功能 -->
-                <div id="admin-only" class="col-span-1 sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4 hidden">
-                    <a href="#"
-                        class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shadow">
-                        <i class="fas fa-user-clock text-xl"></i> 排班系統
-                    </a>
-                    <a href="#"
-                        class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shadow">
-                        <i class="fas fa-users text-xl"></i> 查看會員資料
-                    </a>
-                </div>
             </div>
         </div>
 
@@ -107,16 +92,45 @@
         document.getElementById('profile-info').innerHTML = `
             <div>${roleText}</div>
         `;
-
-        if (profile.role === 'admin') {
-            document.getElementById('admin-only').classList.remove('hidden');
-        }
     }
 
-    document.getElementById('logout-btn').addEventListener('click', function () {
-            localStorage.removeItem('profile');
-            window.location.href = 'index.html';
+    document.addEventListener('DOMContentLoaded', function () {
+            const calendarEl = document.getElementById('calendar');
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+            initialView: 'dayGridMonth',
+            height: 'auto',
+            expandRows: true,
+            dayMaxEventRows: true,
+            eventDisplay: 'block',
+            eventDidMount: function (info) {
+                info.el.setAttribute('title', info.event.title);
+            },
+            events: [
+                {
+                    title: '就是棒',
+                    rrule: {
+                        freq: 'weekly',
+                        interval: 1,
+                        byweekday: ['sa', 'su'],
+                        dtstart: '2025-08-24',
+                        until: '2025-09-28'
+                    },
+                    color: '#1E40AF',
+                    textColor: '#ffffff',
+                    classNames: ['font-bold', 'text-sm', 'px-1', 'py-0.5', 'rounded']
+                }
+            ],
+            locale: 'zh-tw',
+            firstDay: 0
         });
+
+            calendar.render();
+    });
+
+    document.getElementById('logout-btn').addEventListener('click', function () {
+        localStorage.removeItem('profile');
+        window.location.href = 'index.html';
+    });
 </script>
 
 
