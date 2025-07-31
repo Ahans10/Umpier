@@ -134,7 +134,6 @@
                 return;
             }
             const user = data.user;
-            // 查詢 profiles 表
             const { data: profileData, error: profileError } = await supabase
                 .from('profiles')
                 .select('*')
@@ -149,9 +148,7 @@
                 document.getElementById('message').innerText = '登入成功，但查無個人資料';
                 console.log('登入成功，但查無個人資料');
             } else {
-                // 儲存資訊到 localStorage
                 localStorage.setItem('profile', JSON.stringify(profileData));
-                // 檢查 first_login 狀態並導向相應頁面
                 if (profileData.first_login === true) {
                     window.location.href = 'change_password.html';
                 } else {
