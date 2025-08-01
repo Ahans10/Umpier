@@ -91,47 +91,47 @@
     }
 
     async function loadMatchDates() {
-            const profileStr = localStorage.getItem('profile');
-            if (!profileStr) {
-                alert('尚未登入');
-                return;
-            }
-            const profile = JSON.parse(profileStr);
-            const userId = profile.id;
+        const profileStr = localStorage.getItem('profile');
+        if (!profileStr) {
+            alert('尚未登入');
+            return;
+        }
+        const profile = JSON.parse(profileStr);
+        const userId = profile.id;
 
-            const { data: registered, error: regError } = await supabase
-                .from('registrations')
-                .select('match_date_id, description')
-                .eq('user_id', userId);
+        const { data: registered, error: regError } = await supabase
+            .from('registrations')
+            .select('match_date_id, description')
+            .eq('user_id', userId);
 
-            if (regError) {
-                console.error('❌ 載入報名資料失敗：', regError);
-                return;
-            }
+        if (regError) {
+            console.error('❌ 載入報名資料失敗：', regError);
+            return;
+        }
 
-            const registeredIds = registered.map(r => r.match_date_id);
-            const noteMap = {};
-            registered.forEach(r => {
-                noteMap[r.match_date_id] = r.description || '';
-            });
+        const registeredIds = registered.map(r => r.match_date_id);
+        const noteMap = {};
+        registered.forEach(r => {
+            noteMap[r.match_date_id] = r.description || '';
+        });
 
-            const { data, error } = await supabase
-                .from('match_dates')
-                .select('id, date')
-                .order('date');
+        const { data, error } = await supabase
+            .from('match_dates')
+            .select('id, date')
+            .order('date');
 
-            if (error) {
-                console.error('❌ 載入比賽日期失敗：', error);
-                return;
-            }
+        if (error) {
+            console.error('❌ 載入比賽日期失敗：', error);
+            return;
+        }
 
-            const container = document.getElementById('date-options');
-            if (!data || data.length === 0) {
-                container.innerHTML = '<div class="text-center text-red-500 col-span-2">目前沒有可報名的比賽日期</div>';
-                return;
-            }
+        const container = document.getElementById('date-options');
+        if (!data || data.length === 0) {
+            container.innerHTML = '<div class="text-center text-red-500 col-span-2">目前沒有可報名的比賽日期</div>';
+            return;
+        }
 
-            container.innerHTML = data.map(d => {
+        container.innerHTML = data.map(d => {
             const dateText = new Date(d.date).toLocaleDateString('zh-TW', {
                 year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
             });
@@ -150,51 +150,56 @@
                         class="w-full px-3 py-2 rounded-md border border-blue-300 text-base text-blue-800 bg-white" />
                 </div>
                 `;
-            }).join('');
-        }
+        }).join('');
+    }
 
     document.getElementById('register-form').addEventListener('submit', async function (e) {
-            e.preventDefault();
+        e.preventDefault();
 
-            const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
+        const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
 
-            const selectedDateIds = Array.from(checkboxes).map(cb => cb.value);
+        const selectedDateIds = Array.from(checkboxes).map(cb => cb.value);
 
-            const profileStr = localStorage.getItem('profile');
-            if (!profileStr) {
-                alert('尚未登入');
-                return;
-            }
+        const profileStr = localStorage.getItem('profile');
+        if (!profileStr) {
+            alert('尚未登入');
+            return;
+        }
 
-            const profile = JSON.parse(profileStr);
-            const userId = profile.id;
+        const profile = JSON.parse(profileStr);
+        const userId = profile.id;
 
-            const { error: deleteError } = await supabase
-                .from('registrations')
-                .delete()
-                .eq('user_id', userId);
+        const { error: deleteError } = await supabase
+            .from('registrations')
+            .delete()
+            .eq('user_id', userId);
 
-            if (deleteError) {
-                console.error('❌ 刪除舊報名失敗', deleteError);
-            }
+        if (deleteError) {
+            console.error('❌ 刪除舊報名失敗', deleteError);
+        }
 
-            const insertData = selectedDateIds.map(id => ({
+        const insertData = selectedDateIds.map(id => {
+            const noteInput = document.querySelector(`input[name="note-${id}"]`);
+            const note = noteInput ? noteInput.value.trim() : '';
+            return {
                 user_id: userId,
                 match_date_id: id,
+                description: note,
                 registred_at: new Date().toISOString()
-            }));
+            };
+        });
 
-            const { error: insertError } = await supabase
-                .from('registrations')
-                .insert(insertData);
 
-            if (insertError) {
-                console.error('❌ 報名失敗', insertError);
-                alert(`報名失敗，錯誤訊息：${insertError.message}`);
-                alert('報名失敗，請稍後再試');
-            } else {
-                alert('報名成功！');
-            }
+        const { error: insertError } = await supabase
+            .from('registrations')
+            .insert(insertData);
+
+        if (insertError) {
+            console.error('❌ 報名失敗', insertError);
+            alert('報名失敗，請稍後再試');
+        } else {
+            alert('報名成功！');
+        }
     });
 
     document.addEventListener('DOMContentLoaded', () => {
