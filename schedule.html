@@ -44,6 +44,23 @@
 
         <div
             class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-xl mx-auto">
+            <!-- 查詢 by 日期 -->
+            <div class="mb-6">
+                <label class="block text-lg font-semibold text-blue-900 mb-2" for="date-select">選擇比賽日期：</label>
+                <select id="date-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 text-blue-900">
+                    <option value="">請選擇</option>
+                </select>
+                <div id="date-result" class="mt-4 text-blue-800"></div>
+            </div>
+            
+            <!-- 查詢 by 使用者 -->
+            <div class="mb-6">
+                <label class="block text-lg font-semibold text-blue-900 mb-2" for="user-select">選擇報名者：</label>
+                <select id="user-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 text-blue-900">
+                    <option value="">請選擇</option>
+                </select>
+                <div id="user-result" class="mt-4 text-blue-800"></div>
+            </div>
             
             <div class="flex justify-center mt-4" id="back-button">
                 <a href="main.html"
@@ -77,6 +94,113 @@
             <div>${roleText}</div>
         `;
     }
+    document.addEventListener('DOMContentLoaded', async () => {
+            // 取得所有比賽日期
+            const { data: matchDates, error: dateError } = await supabase
+                .from('match_dates')
+                .select('id, date')
+                .order('date');
+
+            if (dateError) {
+                console.error('❌ 載入比賽日期失敗', dateError);
+                return;
+            }
+
+            const dateSelect = document.getElementById('date-select');
+            matchDates.forEach(d => {
+                const opt = document.createElement('option');
+                const dateStr = new Date(d.date).toLocaleDateString('zh-TW', {
+                    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                });
+                opt.value = d.id;
+                opt.textContent = dateStr;
+                dateSelect.appendChild(opt);
+            });
+
+            // 取得所有報名者
+            const { data: users, error: userError } = await supabase
+                .from('profiles')
+                .select('id, name')
+                .order('name');
+
+            if (userError) {
+                console.error('❌ 載入使用者失敗', userError);
+                return;
+            }
+
+            const userSelect = document.getElementById('user-select');
+            users.forEach(u => {
+                const opt = document.createElement('option');
+                opt.value = u.id;
+                opt.textContent = u.name;
+                userSelect.appendChild(opt);
+            });
+        });
+
+        // 🔍 查詢選定日期的報名者
+        document.getElementById('date-select').addEventListener('change', async function () {
+            const dateId = this.value;
+            const resultDiv = document.getElementById('date-result');
+            resultDiv.innerHTML = '';
+
+            if (!dateId) return;
+
+            const { data, error } = await supabase
+                .from('registrations')
+                .select('description, profiles(name)')
+                .eq('match_date_id', dateId);
+
+            if (error) {
+                console.error('❌ 查詢失敗', error);
+                resultDiv.innerHTML = '<p class="text-red-500">查詢失敗，請稍後再試。</p>';
+                return;
+            }
+
+            if (data.length === 0) {
+                resultDiv.innerHTML = '<p class="text-gray-500">目前尚無人報名此日期。</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = `
+        <ul class="list-disc pl-6">
+            ${data.map(r => `<li>${r.profiles.name}（${r.description || '無備註'}）</li>`).join('')}
+        </ul>`;
+        });
+
+        // 🔍 查詢選定使用者的報名日期
+        document.getElementById('user-select').addEventListener('change', async function () {
+            const userId = this.value;
+            const resultDiv = document.getElementById('user-result');
+            resultDiv.innerHTML = '';
+
+            if (!userId) return;
+
+            const { data, error } = await supabase
+                .from('registrations')
+                .select('description, match_dates(date)')
+                .eq('user_id', userId);
+
+            if (error) {
+                console.error('❌ 查詢失敗', error);
+                resultDiv.innerHTML = '<p class="text-red-500">查詢失敗，請稍後再試。</p>';
+                return;
+            }
+
+            if (data.length === 0) {
+                resultDiv.innerHTML = '<p class="text-gray-500">此使用者尚未報名任何場次。</p>';
+                return;
+            }
+
+            resultDiv.innerHTML = `
+        <ul class="list-disc pl-6">
+            ${data.map(r => {
+                const dateStr = new Date(r.match_dates.date).toLocaleDateString('zh-TW', {
+                    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                });
+                return `<li>${dateStr}（${r.description || '無備註'}）</li>`;
+            }).join('')}
+        </ul>`;
+        });
 
     document.getElementById('logout-btn').addEventListener('click', function () {
         localStorage.removeItem('profile');
