@@ -50,7 +50,7 @@
             </button>
             <button id="btn-view-registrations"
                 class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
-                查看報名狀況
+                查看報名資訊
             </button>
             <button id="btn-add-match-date"
                 class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
@@ -450,6 +450,8 @@
         localStorage.removeItem('profile');
         window.location.href = 'index.html';
     });
+
+    document.getElementById('btn-schedule').click();
 </script>
 
 
