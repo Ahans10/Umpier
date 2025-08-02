@@ -4,20 +4,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>行事曆 | 裁判出勤系統</title>
+    <title>競賽規則 | 裁判出勤系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
-
-    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
-    <!-- FullCalendar 主程式 -->
-    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
-    
-    <!-- rrule 函式庫（必要） -->
-    <script src="https://cdn.jsdelivr.net/npm/rrule@2.7.1/dist/es5/rrule.min.js"></script>
-    
-    <!-- FullCalendar 的 rrule 插件 -->
-    <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/rrule@6.1.8/index.global.min.js"></script>
 </head>
 
 <body
@@ -53,13 +43,10 @@
         </div>
 
         <div
-            class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-5xl mx-auto min-h-auto sm:min-h-auto">
-            <div id="calendar" class="w-full sm:max-w-4xl mx-auto mt-6 
-                        text-[12px] sm:text-base 
-                        [&_.fc-event-title]:whitespace-normal 
-                        [&_.fc-event-title]:break-words">
-            </div>
-
+            class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-xl mx-auto text-center space-y-6">
+            <h1
+                class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-400 drop-shadow-md animate-pulse">
+                敬請期待</h1>
 
             <div class="flex justify-center mt-4" id="back-button">
                 <a href="main.html"
@@ -93,55 +80,6 @@
             <div>${roleText}</div>
         `;
     }
-
-    document.addEventListener('DOMContentLoaded', function () {
-            const calendarEl = document.getElementById('calendar');
-            const calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            height: 'auto',
-            expandRows: true,
-            dayMaxEventRows: true,
-            eventDisplay: 'block',
-            eventDidMount: function (info) {
-                info.el.setAttribute('title', info.event.title);
-            },
-            events: [
-                {
-                    title: '就是棒',
-                    rrule: {
-                        freq: 'weekly',
-                        interval: 1,
-                        byweekday: ['sa', 'su'],
-                        dtstart: '2025-08-24',
-                        until: '2025-09-28'
-                    },
-                    color: '#1E40AF',
-                    textColor: '#ffffff',
-                    classNames: ['font-bold', 'text-sm', 'px-1', 'py-0.5', 'rounded']
-                },
-                {
-                    title: '有比賽',
-                    start: '2025-10-04',
-                    end: '2025-10-07', // end 是不含這一天，所以要寫 10/7 表示到 10/6
-                    color: '#111827', // 更深色（幾乎黑色）
-                    textColor: '#ffffff',
-                    classNames: ['font-bold', 'text-sm', 'px-1', 'py-0.5', 'rounded']
-                },
-                {
-                    title: '有比賽',
-                    start: '2025-10-10',
-                    end: '2025-10-13', // 到 10/12
-                    color: '#111827',
-                    textColor: '#ffffff',
-                    classNames: ['font-bold', 'text-sm', 'px-1', 'py-0.5', 'rounded']
-                }
-            ],
-            locale: 'zh-tw',
-            firstDay: 0
-        });
-
-            calendar.render();
-    });
 
     document.getElementById('logout-btn').addEventListener('click', function () {
         localStorage.removeItem('profile');
