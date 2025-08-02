@@ -42,27 +42,28 @@
             </div>
         </div>
 
-        <div
-            class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-xl mx-auto">
-            <!-- 查詢 by 日期 -->
-            <div class="mb-6">
-                <label class="block text-lg font-semibold text-blue-900 mb-2" for="date-select">選擇比賽日期：</label>
-                <select id="date-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 text-blue-900">
-                    <option value="">請選擇</option>
-                </select>
-                <div id="date-result" class="mt-4 text-blue-800"></div>
-            </div>
-            
-            <!-- 查詢 by 使用者 -->
-            <div class="mb-6">
-                <label class="block text-lg font-semibold text-blue-900 mb-2" for="user-select">選擇報名者：</label>
-                <select id="user-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 text-blue-900">
-                    <option value="">請選擇</option>
-                </select>
-                <div id="user-result" class="mt-4 text-blue-800"></div>
-            </div>
-            
-            <div class="flex justify-center mt-4" id="back-button">
+        <!-- 在下方新增一個按鈕列 -->
+        <div class="flex justify-center gap-4 mt-10">
+            <button id="btn-schedule"
+                class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
+                排班表
+            </button>
+            <button id="btn-view-registrations"
+                class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
+                查看報名狀況
+            </button>
+            <button id="btn-add-match-date"
+                class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
+                新增賽事日期
+            </button>
+        </div>
+
+        <div id="content-inner"
+            class="mt-8 max-w-3xl mx-auto bg-white/90 border border-blue-300 rounded-2xl shadow p-8 text-blue-900 flex flex-col gap-6">
+        
+            <div id="content-area"></div>
+        
+            <div class="flex justify-center" id="back-button">
                 <a href="main.html"
                     class="text-center py-2 px-6 rounded-xl border-2 border-blue-600 text-blue-900 font-semibold hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-500 hover:text-white transition">
                     <i class="fas fa-arrow-left me-2"></i>返回首頁
@@ -94,112 +95,355 @@
             <div>${roleText}</div>
         `;
     }
-    document.addEventListener('DOMContentLoaded', async () => {
-            // 取得所有比賽日期
-            const { data: matchDates, error: dateError } = await supabase
-                .from('match_dates')
-                .select('id, date')
-                .order('date');
 
-            if (dateError) {
-                console.error('❌ 載入比賽日期失敗', dateError);
-                return;
-            }
+        const contentArea = document.getElementById('content-area');
 
-            const dateSelect = document.getElementById('date-select');
-            matchDates.forEach(d => {
-                const opt = document.createElement('option');
-                const dateStr = new Date(d.date).toLocaleDateString('zh-TW', {
-                    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
-                });
-                opt.value = d.id;
-                opt.textContent = dateStr;
-                dateSelect.appendChild(opt);
-            });
-
-            // 取得所有報名者
-            const { data: users, error: userError } = await supabase
-                .from('profiles')
-                .select('id, name')
-                .order('name');
-
-            if (userError) {
-                console.error('❌ 載入使用者失敗', userError);
-                return;
-            }
-
-            const userSelect = document.getElementById('user-select');
-            users.forEach(u => {
-                const opt = document.createElement('option');
-                opt.value = u.id;
-                opt.textContent = u.name;
-                userSelect.appendChild(opt);
-            });
+        document.getElementById('btn-schedule').addEventListener('click', () => {
+            contentArea.innerHTML = `
+            <h2 class="text-2xl font-bold mb-6 text-center">班表</h2>
+            <p>這裡是排班表內容。</p>
+            `;
         });
 
-        // 🔍 查詢選定日期的報名者
-        document.getElementById('date-select').addEventListener('change', async function () {
-            const dateId = this.value;
-            const resultDiv = document.getElementById('date-result');
-            resultDiv.innerHTML = '';
+        document.getElementById('btn-view-registrations').addEventListener('click', async () => {
+                contentArea.innerHTML = `
+                    <h2 class="text-2xl font-bold mb-6 text-center">查看報名狀況</h2>
+                    <div class="space-y-6">
+                        <!-- 左右選單 -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 items-end" id="query-options">
+                            <div>
+                                <label class="block font-semibold mb-2">查詢方式：</label>
+                                <select id="query-type" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                    <option value="date">依日期查詢</option>
+                                    <option value="user">依報名者查詢</option>
+                                </select>
+                            </div>
+                            <div id="query-select-box"></div>
+                        </div>
 
-            if (!dateId) return;
+                        <!-- 統一查詢結果區塊（顯示在下方） -->
+                        <div id="query-result-area" class="text-blue-900"></div>
+                    </div>
+                `;
 
-            const { data, error } = await supabase
-                .from('registrations')
-                .select('description, profiles(name)')
-                .eq('match_date_id', dateId);
+                const querySelectBox = document.getElementById('query-select-box');
+                const queryResultArea = document.getElementById('query-result-area');
 
-            if (error) {
-                console.error('❌ 查詢失敗', error);
-                resultDiv.innerHTML = '<p class="text-red-500">查詢失敗，請稍後再試。</p>';
-                return;
-            }
+                async function loadQuerySection(type) {
+                    querySelectBox.innerHTML = '';
+                    queryResultArea.innerHTML = '';
 
-            if (data.length === 0) {
-                resultDiv.innerHTML = '<p class="text-gray-500">目前尚無人報名此日期。</p>';
-                return;
-            }
+                    if (type === 'date') {
+                        const { data: matchDates, error } = await supabase.from('match_dates').select('id, date').order('date');
+                        if (error) return queryResultArea.innerHTML = `<p class="text-red-500">載入日期失敗</p>`;
 
-            resultDiv.innerHTML = `
-        <ul class="list-disc pl-6">
-            ${data.map(r => `<li>${r.profiles.name}（${r.description || '無備註'}）</li>`).join('')}
-        </ul>`;
-        });
+                        querySelectBox.innerHTML = `
+                            <label class="block font-semibold mb-2">選擇比賽日期：</label>
+                            <select id="date-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                <option value="">請選擇</option>
+                                ${matchDates.map(d => {
+                                        const dstr = new Date(d.date).toLocaleDateString('zh-TW', {
+                                            year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                                        });
+                                        return `<option value="${d.id}">${dstr}</option>`;
+                                    }).join('')}
+                            </select>
+                        `;
 
-        // 🔍 查詢選定使用者的報名日期
-        document.getElementById('user-select').addEventListener('change', async function () {
-            const userId = this.value;
-            const resultDiv = document.getElementById('user-result');
-            resultDiv.innerHTML = '';
+                        document.getElementById('date-select').addEventListener('change', async function () {
+                            const dateId = this.value;
+                            queryResultArea.innerHTML = '';
+                            if (!dateId) return;
 
-            if (!userId) return;
+                            const { data, error } = await supabase
+                                .from('registrations')
+                                .select('description, user_id, match_date_id, profiles(name)')
+                                .eq('match_date_id', dateId);
 
-            const { data, error } = await supabase
-                .from('registrations')
-                .select('description, match_dates(date)')
-                .eq('user_id', userId);
+                            if (error) {
+                                queryResultArea.innerHTML = `<p class="text-red-500 font-medium">查詢失敗，請稍後再試。</p>`;
+                            } else if (data.length === 0) {
+                                queryResultArea.innerHTML = `<p class="text-gray-500 font-medium">目前尚無人報名此日期。</p>`;
+                            } else {
+                                queryResultArea.innerHTML = `
+                                    <table class="w-full border border-blue-300 text-sm text-left mt-4">
+                                        <thead class="bg-blue-100 text-blue-800">
+                                            <tr>
+                                                <th class="border px-4 py-2 w-32">姓名</th>
+                                                <th class="border px-4 py-2">備註</th>
+                                                <th class="border px-4 py-2 w-20">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white">
+                                            ${data.map((r, i) => `
+                                                <tr>
+                                                    <td class="border px-4 py-2">${r.profiles.name}</td>
+                                                    <td class="border px-4 py-2">${r.description || '無'}</td>
+                                                    <td class="border px-4 py-2">
+                                                        <div class="flex justify-center items-center gap-3">
+                                                            <button onclick="editRemarkByRow(${i})"
+                                                                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                                                                title="修改備註">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                            <button onclick="deleteRegistrationByRow(${i})"
+                                                                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition"
+                                                                title="刪除報名">
+                                                                <i class="fas fa-trash-alt"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                `;
+                                // 將資料存入全域變數
+                                window.latestDateRegData = data;
+                            }
+                        });
 
-            if (error) {
-                console.error('❌ 查詢失敗', error);
-                resultDiv.innerHTML = '<p class="text-red-500">查詢失敗，請稍後再試。</p>';
-                return;
-            }
+                    } else if (type === 'user') {
+                        const { data: users, error } = await supabase.from('profiles').select('id, name').order('name');
+                        if (error) return queryResultArea.innerHTML = `<p class="text-red-500">載入使用者失敗</p>`;
 
-            if (data.length === 0) {
-                resultDiv.innerHTML = '<p class="text-gray-500">尚未報名任何場次。</p>';
-                return;
-            }
+                        querySelectBox.innerHTML = `
+                            <label class="block font-semibold mb-2">選擇報名者：</label>
+                            <select id="user-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                <option value="">請選擇</option>
+                                ${users.map(u => `<option value="${u.id}">${u.name}</option>`).join('')}
+                            </select>
+                        `;
 
-            resultDiv.innerHTML = `
-        <ul class="list-disc pl-6">
-            ${data.map(r => {
-                const dateStr = new Date(r.match_dates.date).toLocaleDateString('zh-TW', {
-                    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                        document.getElementById('user-select').addEventListener('change', async function () {
+                            const userId = this.value;
+                            queryResultArea.innerHTML = '';
+                            if (!userId) return;
+
+                            const { data, error } = await supabase
+                                .from('registrations')
+                                .select('description, match_dates(id, date), user_id, match_date_id')
+                                .eq('user_id', userId);
+
+                            if (!error && data) {
+                                data.sort((a, b) => new Date(a.match_dates.date) - new Date(b.match_dates.date));
+                            }
+
+                            if (error) {
+                                queryResultArea.innerHTML = `<p class="text-red-500 font-medium">查詢失敗，請稍後再試。</p>`;
+                            } else if (data.length === 0) {
+                                queryResultArea.innerHTML = `<p class="text-gray-500 font-medium">尚未報名任何場次。</p>`;
+                            } else {
+                                queryResultArea.innerHTML = `
+                                    <table class="w-full border border-blue-300 text-sm text-left mt-4">
+                                        <thead class="bg-blue-100 text-blue-800">
+                                            <tr>
+                                                <th class="border px-4 py-2 w-44">日期</th>
+                                                <th class="border px-4 py-2">備註</th>
+                                                <th class="border px-4 py-2 w-20">操作</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="bg-white">
+                                            ${data.map((r, i) => `
+                                                <tr>
+                                                    <td class="border px-4 py-2">${new Date(r.match_dates.date).toLocaleDateString('zh-TW', {
+                                                                year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                                                            })}</td>
+                                                    <td class="border px-4 py-2">${r.description || '無'}</td>
+                                                    <td class="border px-4 py-2">
+                                                        <div class="flex justify-center items-center gap-3">
+                                                            <button onclick="editRemark(${i})"
+                                                                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                                                                title="修改備註">
+                                                                <i class="fas fa-edit"></i>
+                                                            </button>
+                                                            <button onclick="deleteRegistration(${i})"
+                                                                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition"
+                                                                title="刪除報名">
+                                                                <i class="fas fa-trash-alt"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            `).join('')}
+                                        </tbody>
+                                    </table>
+                                `;
+                                // 把報名資料存在全域變數，方便修改時取用
+                                window.latestUserRegData = data;
+
+                                // 顯示使用者未報名的場次供新增
+                                const { data: allDates, error: dateErr } = await supabase.from('match_dates').select('id, date').order('date');
+                                if (dateErr) return queryResultArea.innerHTML += `<p class="text-red-500 mt-4">載入可新增場次失敗</p>`;
+
+                                const registeredIds = data.map(r => r.match_date_id);
+                                const availableDates = allDates.filter(d => !registeredIds.includes(d.id)).sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                                if (availableDates.length === 0) {
+                                    queryResultArea.innerHTML += `<p class="text-gray-500 mt-6 font-medium">此使用者已報名所有場次。</p>`;
+                                } else {
+                                    queryResultArea.innerHTML += `
+                                        <div class="mt-10 pt-6 border-t border-blue-200">
+                                            <h3 class="text-lg font-bold mb-4">為該使用者新增報名場次</h3>
+                                            <form id="admin-add-form" class="space-y-4">
+                                                ${availableDates.map(d => {
+                                                                        const dateStr = new Date(d.date).toLocaleDateString('zh-TW', {
+                                                                            year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                                                                        });
+                                                                        return `
+                                                        <div class="flex items-center gap-4">
+                                                            <input type="checkbox" id="chk-${d.id}" name="dates" value="${d.id}" class="w-5 h-5 text-blue-600" />
+                                                            <label for="chk-${d.id}" class="w-48 font-medium">${dateStr}</label>
+                                                            <input type="text" name="note-${d.id}" placeholder="備註（可不填）"
+                                                                class="flex-1 px-3 py-1.5 border rounded bg-white text-blue-900" />
+                                                        </div>`;
+                                                                    }).join('')}
+                                                <div class="text-right">
+                                                    <button type="submit"
+                                                        class="mt-4 px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                                                        送出新增
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    `;
+
+                                    // 綁定表單送出事件
+                                    document.getElementById('admin-add-form').addEventListener('submit', async function (e) {
+                                        e.preventDefault();
+
+                                        const checked = Array.from(document.querySelectorAll('input[name="dates"]:checked'));
+                                        if (checked.length === 0) return alert('請勾選至少一個比賽日期');
+
+                                        const insertData = checked.map(cb => {
+                                            const id = cb.value;
+                                            const note = document.querySelector(`input[name="note-${id}"]`)?.value.trim() || '';
+                                            return {
+                                                user_id: userId,
+                                                match_date_id: id,
+                                                description: note,
+                                                registred_at: new Date().toISOString()
+                                            };
+                                        });
+
+                                        const { error: insertErr } = await supabase.from('registrations').insert(insertData);
+                                        if (insertErr) {
+                                            alert('新增失敗，請稍後再試');
+                                            console.error(insertErr);
+                                        } else {
+                                            alert('新增成功');
+                                            document.getElementById('user-select').dispatchEvent(new Event('change')); // 重新載入
+                                        }
+                                    });
+                                }
+                            }
+                        });
+                    }
+                }
+
+                // 預設載入「依日期查詢」
+                await loadQuerySection('date');
+
+                // 監聽查詢方式切換
+                document.getElementById('query-type').addEventListener('change', function () {
+                    loadQuerySection(this.value);
                 });
-                return `<li>${dateStr}（${r.description || '無備註'}）</li>`;
-            }).join('')}
-        </ul>`;
+            });
+            async function editRemarkByRow(index) {
+                    const row = window.latestDateRegData[index];
+                    const oldRemark = row.description || '';
+                    const newRemark = prompt('請輸入新的備註：', oldRemark);
+                    if (newRemark === null) return;
+
+                    const { error } = await supabase
+                        .from('registrations')
+                        .update({ description: newRemark })
+                        .match({
+                            user_id: row.user_id,
+                            match_date_id: row.match_date_id
+                        });
+
+                    if (error) {
+                        alert('更新失敗，請稍後再試');
+                    } else {
+                        alert('更新成功');
+                        document.getElementById('date-select').dispatchEvent(new Event('change'));
+                    }
+                }
+
+                async function deleteRegistrationByRow(index) {
+                    const row = window.latestDateRegData[index];
+                    const confirmDelete = confirm(`確定要刪除 ${row.profiles.name} 的報名紀錄嗎？`);
+                    if (!confirmDelete) return;
+
+                    const { error } = await supabase
+                        .from('registrations')
+                        .delete()
+                        .match({
+                            user_id: row.user_id,
+                            match_date_id: row.match_date_id
+                        });
+
+                    if (error) {
+                        alert('刪除失敗，請稍後再試');
+                    } else {
+                        alert('刪除成功');
+                        document.getElementById('date-select').dispatchEvent(new Event('change'));
+                    }
+                }
+            async function editRemark(index) {
+                const row = window.latestUserRegData[index];
+                const oldRemark = row.description || '';
+                const newRemark = prompt('請輸入新的備註：', oldRemark);
+                if (newRemark === null) return; // 使用者取消
+
+                console.log('Updating...', {
+                    user_id: row.user_id,
+                    match_date_id: row.match_date_id,
+                    description: newRemark
+                });
+
+                // 更新資料
+                const { error } = await supabase
+                    .from('registrations')
+                    .update({ description: newRemark })
+                    .match({
+                        user_id: row.user_id,
+                        match_date_id: row.match_date_id
+                    });
+
+                if (error) {
+                    alert('更新失敗，請稍後再試');
+                } else {
+                    alert('更新成功');
+                    document.getElementById('user-select').dispatchEvent(new Event('change')); // 重新載入
+                }
+            }
+            async function deleteRegistration(index) {
+                const row = window.latestUserRegData[index];
+                const confirmDelete = confirm(`確定要刪除報名日期：${new Date(row.match_dates.date).toLocaleDateString('zh-TW')} 的紀錄嗎？`);
+                if (!confirmDelete) return;
+
+                const { error } = await supabase
+                    .from('registrations')
+                    .delete()
+                    .match({
+                        user_id: row.user_id,
+                        match_date_id: row.match_date_id
+                    });
+
+                if (error) {
+                    alert('刪除失敗，請稍後再試');
+                } else {
+                    alert('刪除成功');
+                    document.getElementById('user-select').dispatchEvent(new Event('change')); // 重新載入資料
+                }
+            }
+
+        document.getElementById('btn-add-match-date').addEventListener('click', () => {
+            contentArea.innerHTML = `
+            <h2 class="text-2xl font-bold mb-6 text-center">新增賽事日期</h2>
+            `;
         });
 
     document.getElementById('logout-btn').addEventListener('click', function () {
