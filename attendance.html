@@ -199,6 +199,7 @@
             alert('報名失敗，請稍後再試');
         } else {
             alert('報名成功！');
+            document.getElementById('user-select').dispatchEvent(new Event('change'));
         }
     });
 

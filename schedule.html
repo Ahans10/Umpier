@@ -231,46 +231,48 @@
 
                             if (error) {
                                 queryResultArea.innerHTML = `<p class="text-red-500 font-medium">查詢失敗，請稍後再試。</p>`;
-                            } else if (data.length === 0) {
-                                queryResultArea.innerHTML = `<p class="text-gray-500 font-medium">尚未報名任何場次。</p>`;
                             } else {
-                                queryResultArea.innerHTML = `
-                                    <table class="w-full border border-blue-300 text-sm text-left mt-4">
-                                        <thead class="bg-blue-100 text-blue-800">
-                                            <tr>
-                                                <th class="border px-4 py-2 w-44">日期</th>
-                                                <th class="border px-4 py-2">備註</th>
-                                                <th class="border px-4 py-2 w-20">操作</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="bg-white">
-                                            ${data.map((r, i) => `
+                                if (data.length === 0) {
+                                    queryResultArea.innerHTML = `<p class="text-gray-500 font-medium">尚未報名任何場次。</p>`;
+                                } else {
+                                    queryResultArea.innerHTML = `
+                                        <table class="w-full border border-blue-300 text-sm text-left mt-4">
+                                            <thead class="bg-blue-100 text-blue-800">
                                                 <tr>
-                                                    <td class="border px-4 py-2">${new Date(r.match_dates.date).toLocaleDateString('zh-TW', {
-                                                                year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
-                                                            })}</td>
-                                                    <td class="border px-4 py-2">${r.description || '無'}</td>
-                                                    <td class="border px-4 py-2">
-                                                        <div class="flex justify-center items-center gap-3">
-                                                            <button onclick="editRemark(${i})"
-                                                                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
-                                                                title="修改備註">
-                                                                <i class="fas fa-edit"></i>
-                                                            </button>
-                                                            <button onclick="deleteRegistration(${i})"
-                                                                class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition"
-                                                                title="刪除報名">
-                                                                <i class="fas fa-trash-alt"></i>
-                                                            </button>
-                                                        </div>
-                                                    </td>
+                                                    <th class="border px-4 py-2 w-44">日期</th>
+                                                    <th class="border px-4 py-2">備註</th>
+                                                    <th class="border px-4 py-2 w-20">操作</th>
                                                 </tr>
-                                            `).join('')}
-                                        </tbody>
-                                    </table>
-                                `;
-                                // 把報名資料存在全域變數，方便修改時取用
-                                window.latestUserRegData = data;
+                                            </thead>
+                                            <tbody class="bg-white">
+                                                ${data.map((r, i) => `
+                                                    <tr>
+                                                        <td class="border px-4 py-2">${new Date(r.match_dates.date).toLocaleDateString('zh-TW', {
+                                                                    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                                                                })}</td>
+                                                        <td class="border px-4 py-2">${r.description || '無'}</td>
+                                                        <td class="border px-4 py-2">
+                                                            <div class="flex justify-center items-center gap-3">
+                                                                <button onclick="editRemark(${i})"
+                                                                    class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200 transition"
+                                                                    title="修改備註">
+                                                                    <i class="fas fa-edit"></i>
+                                                                </button>
+                                                                <button onclick="deleteRegistration(${i})"
+                                                                    class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200 transition"
+                                                                    title="刪除報名">
+                                                                    <i class="fas fa-trash-alt"></i>
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                `).join('')}
+                                            </tbody>
+                                        </table>
+                                    `;
+                                    // 把報名資料存在全域變數，方便修改時取用
+                                    window.latestUserRegData = data;
+                                }
 
                                 // 顯示使用者未報名的場次供新增
                                 const { data: allDates, error: dateErr } = await supabase.from('match_dates').select('id, date').order('date');
