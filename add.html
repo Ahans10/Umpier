@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新增賽事資料 | 裁判出勤系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+
+<body
+    class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-blue-200 via-30% to-blue-400 font-sans text-blue-900 font-[Segoe_UI]">
+    <div class="container mx-auto py-10 px-4">
+
+        <div class="rounded-2xl bg-white/90 backdrop-blur border border-blue-300 shadow-lg text-center py-8 mb-10">
+            <h1 class="text-4xl font-bold mb-3">裁判出勤系統</h1>
+        </div>
+
+        <div
+            class="max-w-2xl mx-auto bg-white/90 backdrop-blur-md border border-blue-200 rounded-2xl shadow-lg p-8 mb-10 flex flex-col sm:flex-row justify-between items-center gap-6 sm:gap-4">
+            <div class="flex w-full sm:w-1/4 justify-center sm:justify-end pr-0 sm:pr-6">
+                <i class="fas fa-user text-blue-500 text-6xl drop-shadow-sm"></i>
+            </div>
+
+            <div
+                class="flex flex-col justify-center sm:items-start items-center sm:w-2/4 text-blue-900 text-center sm:text-left">
+                <div id="profile-info" class="text-xl font-bold leading-snug text-blue-800"></div>
+                <h2 id="welcome-title" class="text-2xl sm:text-3xl font-bold mb-1">您好!</h2>
+            </div>
+
+            <div class="flex flex-col sm:w-1/4 w-full items-center gap-3">
+                <a href="change_password.html" id="change-pwd-btn"
+                    class="w-full px-5 py-2 rounded-xl bg-white border-2 border-blue-400 text-blue-800 font-semibold hover:bg-blue-100 transition shadow-sm text-center">
+                    <i class="fas fa-key me-2"></i>修改密碼
+                </a>
+                <button id="logout-btn"
+                    class="w-full px-5 py-2 rounded-xl bg-white border-2 border-red-300 text-red-600 font-semibold hover:bg-red-100 transition shadow-sm text-center">
+                    <i class="fas fa-sign-out-alt me-2"></i>登出
+                </button>
+            </div>
+        </div>
+
+        <div class="flex justify-center gap-4 mt-10">
+            <button id="btn-manage-games" 
+                class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
+                <i class="fas fa-trophy"></i>賽事管理
+            </button>
+            <button id="btn-manage-dates"
+                class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
+                <i class="fas fa-calendar-alt"></i>日期管理
+            </button>
+            <button id="btn-manage-teams"
+                class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
+                <i class="fas fa-users"></i>隊伍管理
+            </button>
+            <button id="btn-manage-locations"
+                class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
+                <i class="fas fa-map-marker-alt mr-1"></i>地點管理
+            </button>
+        </div>
+
+        <div id="content-inner"
+            class="mt-8 max-w-3xl mx-auto bg-white/90 border border-blue-300 rounded-2xl shadow p-8 text-blue-900 flex flex-col gap-6">
+
+            <div id="content-area"></div>
+
+            <div class="flex justify-center" id="back-button">
+                <a href="main.html"
+                    class="text-center py-2 px-6 rounded-xl border-2 border-blue-600 text-blue-900 font-semibold hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-500 hover:text-white transition">
+                    <i class="fas fa-arrow-left me-2"></i>返回首頁
+                </a>
+            </div>
+        </div>
+
+        <div class="text-center mt-10">
+            <small class="text-blue-800">
+                <i class="fas fa-copyright mr-1"></i>
+                裁判出勤系統
+            </small>
+        </div>
+    </div>
+</body>
+<script>
+    const supabaseUrl = 'https://qfupnebeqjzhqplqkuqz.supabase.co';
+    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmdXBuZWJlcWp6aHFwbHFrdXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0OTgzNzksImV4cCI6MjA2NjA3NDM3OX0.NUeJJ9liEi1Ckx9BrCTIr5ibZqkPaxQYLVC7-VvbzvA';
+    const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseKey) : window.Supabase.createClient(supabaseUrl, supabaseKey);
+
+    const profileStr = localStorage.getItem('profile');
+    if (profileStr) {
+        const profile = JSON.parse(profileStr);
+        const roleText = profile.role === 'admin' ? '管理員'
+            : profile.role === 'member' ? '裁判員' : '（未知身份）';
+
+        document.getElementById('welcome-title').innerText = `${profile.name || ''} 您好 !`;
+        document.getElementById('profile-info').innerHTML = `
+            <div>${roleText}</div>
+        `;
+    }
+
+    const contentArea = document.getElementById('content-area');
+
+    document.getElementById('btn-manage-games').addEventListener('click', async () => {
+            contentArea.innerHTML = `
+            <h2 class="text-2xl font-bold mb-6 text-center">班表</h2>
+            <p>這裡是賽事管理。</p>
+            `;
+        });
+
+    document.getElementById('btn-manage-dates').addEventListener('click', async () => {
+            contentArea.innerHTML = `
+            <h2 class="text-2xl font-bold mb-6 text-center">班表</h2>
+            <p>這裡是日期管理。</p>
+            `;
+        });
+        
+    document.getElementById('btn-manage-teams').addEventListener('click', async () => {
+            contentArea.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6 text-center">新增賽事日期&隊伍</h2>
+
+                <div class="space-y-6">
+                <div>
+                    <label class="block font-semibold mb-2">選擇賽事</label>
+                    <select id="games-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                    <option value="">載入中...</option>
+                    </select>
+                </div>
+
+                <form id="team-form" class="space-y-4">
+                    <div>
+                    <label class="block font-semibold mb-2">隊伍名稱</label>
+                    <input id="team-name" type="text" placeholder="請輸入隊伍名稱"
+                            class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                    </div>
+
+                    <div class="text-right">
+                    <button type="submit"
+                            class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                        送出新增
+                    </button>
+                    </div>
+                </form>
+
+                <div id="teams-list" class="pt-4 border-t border-blue-200"></div>
+                </div>
+            `;
+
+            const gamesSelect = document.getElementById('games-select');
+            const teamForm = document.getElementById('team-form');
+            const teamNameInput = document.getElementById('team-name');
+            const teamsList = document.getElementById('teams-list');
+
+            const { data: games, error: gamesErr } = await supabase
+                .from('games')
+                .select('*')
+                .order('name', { ascending: true });
+
+            if (gamesErr) {
+                gamesSelect.innerHTML = `<option value="">載入賽事失敗</option>`;
+                console.error(gamesErr);
+            } else {
+                gamesSelect.innerHTML = `<option value="">請選擇賽事</option>` +
+                    games.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+            }
+
+            gamesSelect.addEventListener('change', () => {
+                renderTeamsList(gamesSelect.value);
+            });
+
+            teamForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const gamesId = gamesSelect.value;
+                const name = (teamNameInput.value || '').trim();
+
+                if (!gamesId) {
+                    alert('請先選擇賽事');
+                    return;
+                }
+                if (!name) {
+                    alert('請輸入隊伍名稱');
+                    return;
+                }
+
+                const { data: dup, error: dupErr } = await supabase
+                    .from('teams')
+                    .select('id')
+                    .eq('games_id', gamesId)
+                    .ilike('name', name);
+
+                if (!dupErr && dup && dup.length > 0) {
+                    alert('此賽事已存在相同隊名，請確認。');
+                    return;
+                }
+
+                const { error: insertErr } = await supabase.from('teams').insert({
+                    games_id: gamesId,
+                    name: name
+                });
+
+                if (insertErr) {
+                    alert('新增失敗，請稍後再試');
+                    console.error(insertErr);
+                } else {
+                    alert('新增成功');
+                    teamNameInput.value = '';
+                    renderTeamsList(gamesId);
+                }
+            });
+
+            async function renderTeamsList(gamesId) {
+                if (!gamesId) {
+                    teamsList.innerHTML = '';
+                    return;
+                }
+                const { data, error } = await supabase
+                    .from('teams')
+                    .select('id, name')
+                    .eq('games_id', gamesId)
+                    .order('name', { ascending: true });
+
+                if (error) {
+                    teamsList.innerHTML = `<p class="text-red-500">載入隊伍失敗</p>`;
+                    console.error(error);
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    teamsList.innerHTML = `<p class="text-gray-600">目前此賽事尚無參賽隊伍。</p>`;
+                    return;
+                }
+
+                teamsList.innerHTML = `
+                    <h3 class="text-lg font-bold mb-3">已建立隊伍</h3>
+                    <table class="w-full border border-blue-300 text-sm text-left">
+                    <thead class="bg-blue-100 text-blue-800">
+                        <tr>
+                        <th class="border px-4 py-2">隊伍名稱</th>
+                        <th class="border px-4 py-2 w-32 text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white">
+                        ${data.map(t => `
+                        <tr>
+                            <td class="border px-4 py-2">${t.name}</td>
+                            <td class="border px-4 py-2 text-center">
+                            <div class="inline-flex items-center gap-2">
+                                <button data-id="${t.id}" data-name="${t.name}"
+                                        class="btn-edit-team inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                        title="修改">
+                                <i class="fas fa-edit"></i>
+                                </button>
+                                <button data-id="${t.id}"
+                                        class="btn-del-team inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
+                                        title="刪除">
+                                <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                            </td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                    </table>
+                `;
+
+                document.querySelectorAll('.btn-del-team').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        if (!confirm('確定刪除此隊伍？')) return;
+                        const { error: delErr } = await supabase.from('teams').delete().eq('id', id);
+                        if (delErr) {
+                            alert('刪除失敗，請稍後再試');
+                            console.error(delErr);
+                        } else {
+                            renderTeamsList(gamesId);
+                        }
+                    });
+                });
+
+                document.querySelectorAll('.btn-edit-team').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        const oldName = btn.getAttribute('data-name') || '';
+                        const newNameRaw = prompt('請輸入新的隊伍名稱：', oldName);
+                        const newName = (newNameRaw || '').trim();
+
+                        if (newName === null) return;
+                        if (!newName) {
+                            alert('隊伍名稱不可為空白');
+                            return;
+                        }
+                        if (newName === oldName) return;
+
+                        const { data: dup, error: dupErr } = await supabase
+                            .from('teams')
+                            .select('id')
+                            .eq('games_id', gamesId)
+                            .ilike('name', newName);
+
+                        if (!dupErr && dup && dup.length > 0) {
+                            alert('此賽事已存在相同隊名，請確認。');
+                            return;
+                        }
+
+                        const { error: updErr } = await supabase
+                            .from('teams')
+                            .update({ name: newName })
+                            .eq('id', id);
+
+                        if (updErr) {
+                            alert('更新失敗，請稍後再試');
+                            console.error(updErr);
+                        } else {
+                            alert('更新成功');
+                            renderTeamsList(gamesId);
+                        }
+                    });
+                });
+            }
+            async function renderTeamsList(gamesId) {
+                if (!gamesId) {
+                    teamsList.innerHTML = '';
+                    return;
+                }
+                const { data, error } = await supabase
+                    .from('teams')
+                    .select('id, name')
+                    .eq('games_id', gamesId)
+                    .order('name', { ascending: true });
+
+                if (error) {
+                    teamsList.innerHTML = `<p class="text-red-500">載入隊伍失敗</p>`;
+                    console.error(error);
+                    return;
+                }
+
+                if (!data || data.length === 0) {
+                    teamsList.innerHTML = `<p class="text-gray-600">目前此賽事尚無隊伍。</p>`;
+                    return;
+                }
+
+                teamsList.innerHTML = `
+                    <h3 class="text-lg font-bold mb-3">已建立隊伍</h3>
+                    <table class="w-full border border-blue-300 text-sm text-left">
+                    <thead class="bg-blue-100 text-blue-800">
+                        <tr>
+                        <th class="border px-4 py-2">隊伍名稱</th>
+                        <th class="border px-4 py-2 w-32 text-center">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white">
+                        ${data.map(t => `
+                        <tr>
+                            <td class="border px-4 py-2">${t.name}</td>
+                            <td class="border px-4 py-2 text-center">
+                            <div class="inline-flex items-center gap-2">
+                                <button data-id="${t.id}" data-name="${t.name}"
+                                        class="btn-edit-team inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                        title="修改">
+                                <i class="fas fa-edit"></i>
+                                </button>
+                                <button data-id="${t.id}"
+                                        class="btn-del-team inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
+                                        title="刪除">
+                                <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                            </td>
+                        </tr>
+                        `).join('')}
+                    </tbody>
+                    </table>
+                `;
+
+                document.querySelectorAll('.btn-del-team').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        if (!confirm('確定刪除此隊伍？')) return;
+                        const { error: delErr } = await supabase.from('teams').delete().eq('id', id);
+                        if (delErr) {
+                            alert('刪除失敗，請稍後再試');
+                            console.error(delErr);
+                        } else {
+                            renderTeamsList(gamesId);
+                        }
+                    });
+                });
+
+                document.querySelectorAll('.btn-edit-team').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        const oldName = btn.getAttribute('data-name') || '';
+                        const newNameRaw = prompt('請輸入新的隊伍名稱：', oldName);
+                        const newName = (newNameRaw || '').trim();
+
+                        if (newName === null) return;
+                        if (!newName) {
+                            alert('隊伍名稱不可為空白');
+                            return;
+                        }
+                        if (newName === oldName) return;
+
+                        const { data: dup, error: dupErr } = await supabase
+                            .from('teams')
+                            .select('id')
+                            .eq('games_id', gamesId)
+                            .ilike('name', newName);
+
+                        if (!dupErr && dup && dup.length > 0) {
+                            alert('此賽事已存在相同隊名，請確認。');
+                            return;
+                        }
+
+                        const { error: updErr } = await supabase
+                            .from('teams')
+                            .update({ name: newName })
+                            .eq('id', id);
+
+                        if (updErr) {
+                            alert('更新失敗，請稍後再試');
+                            console.error(updErr);
+                        } else {
+                            alert('更新成功');
+                            renderTeamsList(gamesId);
+                        }
+                    });
+                });
+            }
+        });
+
+    document.getElementById('btn-manage-locations').addEventListener('click', async () => {
+            contentArea.innerHTML = `
+            <h2 class="text-2xl font-bold mb-6 text-center">班表</h2>
+            <p>這裡是地點管理。</p>
+            `;
+        });
+
+    document.getElementById('logout-btn').addEventListener('click', function () {
+        localStorage.removeItem('profile');
+        window.location.href = 'index.html';
+    });
+
+    document.getElementById('btn-manage-games').click();
+</script>
+
+</html>

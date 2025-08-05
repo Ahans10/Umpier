@@ -46,15 +46,15 @@
         <div class="flex justify-center gap-4 mt-10">
             <button id="btn-schedule"
                 class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
-                排班表
+                排班
             </button>
             <button id="btn-view-registrations"
                 class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
-                查看報名資訊
+                報名資訊
             </button>
             <button id="btn-add-match-date"
                 class="flex items-center gap-3 px-5 py-4 rounded-xl bg-yellow-100 border border-yellow-300 text-yellow-900 font-semibold text-lg hover:bg-yellow-200 transition shado">
-                新增賽事日期
+                賽程表管理
             </button>
         </div>
 
@@ -198,7 +198,6 @@
                                         </tbody>
                                     </table>
                                 `;
-                                // 將資料存入全域變數
                                 window.latestDateRegData = data;
                             }
                         });
@@ -270,11 +269,9 @@
                                             </tbody>
                                         </table>
                                     `;
-                                    // 把報名資料存在全域變數，方便修改時取用
                                     window.latestUserRegData = data;
                                 }
 
-                                // 顯示使用者未報名的場次供新增
                                 const { data: allDates, error: dateErr } = await supabase.from('match_dates').select('id, date').order('date');
                                 if (dateErr) return queryResultArea.innerHTML += `<p class="text-red-500 mt-4">載入可新增場次失敗</p>`;
 
@@ -310,7 +307,6 @@
                                         </div>
                                     `;
 
-                                    // 綁定表單送出事件
                                     document.getElementById('admin-add-form').addEventListener('submit', async function (e) {
                                         e.preventDefault();
 
@@ -343,10 +339,8 @@
                     }
                 }
 
-                // 預設載入「依日期查詢」
                 await loadQuerySection('date');
 
-                // 監聽查詢方式切換
                 document.getElementById('query-type').addEventListener('change', function () {
                     loadQuerySection(this.value);
                 });
@@ -397,15 +391,13 @@
                 const row = window.latestUserRegData[index];
                 const oldRemark = row.description || '';
                 const newRemark = prompt('請輸入新的備註：', oldRemark);
-                if (newRemark === null) return; // 使用者取消
-
+                if (newRemark === null) return;
                 console.log('Updating...', {
                     user_id: row.user_id,
                     match_date_id: row.match_date_id,
                     description: newRemark
                 });
 
-                // 更新資料
                 const { error } = await supabase
                     .from('registrations')
                     .update({ description: newRemark })
@@ -440,11 +432,12 @@
                     alert('刪除成功');
                     document.getElementById('user-select').dispatchEvent(new Event('change')); // 重新載入資料
                 }
-            }
+        }
 
-        document.getElementById('btn-add-match-date').addEventListener('click', () => {
+        document.getElementById('btn-add-match-date').addEventListener('click', async () => {
             contentArea.innerHTML = `
-            <h2 class="text-2xl font-bold mb-6 text-center">新增賽事日期</h2>
+            <h2 class="text-2xl font-bold mb-6 text-center">班表</h2>
+            <p>這裡是賽程表內容。</p>
             `;
         });
 
@@ -455,6 +448,4 @@
 
     document.getElementById('btn-schedule').click();
 </script>
-
-
 </html>
