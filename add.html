@@ -101,12 +101,87 @@
 
     const contentArea = document.getElementById('content-area');
 
+    // === 賽事管理按鈕 ===
     document.getElementById('btn-manage-games').addEventListener('click', async () => {
-            contentArea.innerHTML = `
-            <h2 class="text-2xl font-bold mb-6 text-center">班表</h2>
-            <p>這裡是賽事管理。</p>
-            `;
+        contentArea.innerHTML = `<h2 class="text-2xl font-bold mb-6 text-center">賽事管理</h2>
+            <form id="game-form" class="flex gap-3 items-end">
+            <div class="flex-1">
+                <label class="block font-semibold mb-2">賽事名稱</label>
+                <input id="game-name" type="text" placeholder="輸入賽事名稱"
+                    class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+            </div>
+            <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">新增賽事</button>
+            </form>
+            <div id="games-list" class="pt-4"></div>`;
+
+        const gameForm = document.getElementById('game-form');
+        const gameNameInput = document.getElementById('game-name');
+        const gamesList = document.getElementById('games-list');
+
+        async function renderGamesList() {
+            const { data, error } = await supabase.from('games').select('id, name').order('name', { ascending: true });
+            if (error) { gamesList.innerHTML = `<p class="text-red-500">載入賽事失敗</p>`; return; }
+            if (!data || data.length === 0) { gamesList.innerHTML = `<p class="text-gray-600">目前尚無賽事。</p>`; return; }
+
+            gamesList.innerHTML = `
+                <table class="w-full border border-blue-300 text-sm text-left">
+                <thead class="bg-blue-100 text-blue-800">
+                    <tr>
+                    <th class="border px-4 py-2">賽事名稱</th>
+                    <th class="border px-4 py-2 w-32 text-center">操作</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white">
+                    ${data.map(g => `
+                    <tr>
+                        <td class="border px-4 py-2">${g.name}</td>
+                        <td class="border px-4 py-2 text-center">
+                        <div class="inline-flex items-center gap-2">
+                            <button data-id="${g.id}" data-name="${g.name}" class="btn-edit-game w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200" title="修改"><i class="fas fa-edit"></i></button>
+                            <button data-id="${g.id}" class="btn-del-game w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200" title="刪除"><i class="fas fa-trash-alt"></i></button>
+                        </div>
+                        </td>
+                    </tr>`).join('')}
+                </tbody>
+                </table>`;
+
+            gamesList.querySelectorAll('.btn-edit-game').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-id');
+                    const oldName = btn.getAttribute('data-name') || '';
+                    const raw = prompt('請輸入新的賽事名稱：', oldName);
+                    if (raw === null) return;
+                    const newName = raw.trim();
+                    if (!newName) return alert('賽事名稱不可空白');
+                    if (newName === oldName) return;
+                    const { error } = await supabase.from('games').update({ name: newName }).eq('id', id);
+                    if (error) alert('更新失敗');
+                    else { await renderGamesList(); alert('更新成功'); }
+                });
+            });
+
+            gamesList.querySelectorAll('.btn-del-game').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.getAttribute('data-id');
+                    if (!confirm('確定要刪除此賽事？')) return;
+                    const { error } = await supabase.from('games').delete().eq('id', id);
+                    if (error) alert('刪除失敗');
+                    else renderGamesList();
+                });
+            });
+        }
+
+        gameForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const name = gameNameInput.value.trim();
+            if (!name) return alert('請輸入賽事名稱');
+            const { error } = await supabase.from('games').insert({ name });
+            if (error) alert('新增失敗');
+            else { gameNameInput.value = ''; await renderGamesList(); }
         });
+
+        renderGamesList();
+    });
 
     document.getElementById('btn-manage-dates').addEventListener('click', async () => {
             contentArea.innerHTML = `
@@ -117,7 +192,7 @@
         
     document.getElementById('btn-manage-teams').addEventListener('click', async () => {
             contentArea.innerHTML = `
-                <h2 class="text-2xl font-bold mb-6 text-center">新增賽事日期&隊伍</h2>
+                <h2 class="text-2xl font-bold mb-6 text-center">新增賽事隊伍</h2>
 
                 <div class="space-y-6">
                 <div>
@@ -231,7 +306,7 @@
                 }
 
                 teamsList.innerHTML = `
-                    <h3 class="text-lg font-bold mb-3">已建立隊伍</h3>
+                    <h3 class="text-lg font-bold mb-3">已報名隊伍</h3>
                     <table class="w-full border border-blue-300 text-sm text-left">
                     <thead class="bg-blue-100 text-blue-800">
                         <tr>
@@ -340,7 +415,7 @@
                 }
 
                 teamsList.innerHTML = `
-                    <h3 class="text-lg font-bold mb-3">已建立隊伍</h3>
+                    <h3 class="text-lg font-bold mb-3">已報名隊伍</h3>
                     <table class="w-full border border-blue-300 text-sm text-left">
                     <thead class="bg-blue-100 text-blue-800">
                         <tr>
