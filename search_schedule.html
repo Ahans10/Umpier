@@ -42,11 +42,12 @@
             </div>
         </div>
 
-        <div class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-xl mx-auto text-center space-y-6">
-            <h1 class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-400 drop-shadow-md animate-pulse">
-                敬請期待</h1>
-                
-            <div class="flex justify-center mt-4" id="back-button">
+        <div id="content-inner"
+            class="mt-8 max-w-7xl mx-auto bg-white/90 border border-blue-300 rounded-2xl shadow p-8 text-blue-900 flex flex-col gap-6">
+
+            <div id="content-area"></div>
+        
+            <div class="flex justify-center" id="back-button">
                 <a href="main.html"
                     class="text-center py-2 px-6 rounded-xl border-2 border-blue-600 text-blue-900 font-semibold hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-500 hover:text-white transition">
                     <i class="fas fa-arrow-left me-2"></i>返回首頁
@@ -78,6 +79,235 @@
             <div>${roleText}</div>
         `;
     }
+
+    (async function myScheduleByRegistration() {
+            if (!window.supabase) return alert('Supabase 尚未載入');
+            const profileStr = localStorage.getItem('profile');
+            if (!profileStr) { window.location.href = 'index.html'; return; }
+            const me = JSON.parse(profileStr);
+            const myId = String(me.id || me.user_id || '');
+
+            const contentArea = document.getElementById('content-area');
+            contentArea.innerHTML = `
+                <h2 class="text-3xl font-bold mb-8 text-center text-blue-900">我的班表</h2>
+
+                <div class="flex justify-center mb-8">
+                    <div class="flex items-center gap-4">
+                    <label for="my-date" class="text-xl font-semibold text-blue-800">選擇日期</label>
+                    <select id="my-date" class="border border-blue-400 rounded-lg px-6 py-3 bg-white text-blue-900 text-lg shadow-md">
+                        <option value="">載入中...</option>
+                    </select>
+                    </div>
+                </div>
+
+                <div id="my-tip" class="text-lg text-center font-medium text-blue-700 mb-4">選擇日期後會自動查詢已上傳的班表</div>
+                <div id="my-result" class="space-y-10"></div>
+                `;
+
+            const el = {
+                date: document.getElementById('my-date'),
+                tip: document.getElementById('my-tip'),
+                result: document.getElementById('my-result'),
+            };
+
+            el.tip.textContent = '讀取你報名的日期中...';
+            const { data: regis, error: regErr } = await supabase
+                .from('registrations')
+                .select('match_date_id')
+                .eq('user_id', myId);
+
+            if (regErr) {
+                console.error(regErr);
+                el.tip.textContent = '讀取報名資料失敗';
+                return;
+            }
+
+            const myDateIds = [...new Set((regis || []).map(r => String(r.match_date_id)))];
+            if (myDateIds.length === 0) {
+                el.date.innerHTML = `<option value="">你尚未報名任何日期</option>`;
+                el.tip.textContent = '';
+                return;
+            }
+
+            const { data: dates, error: dateErr } = await supabase
+                .from('match_dates')
+                .select('id, date')
+                .in('id', myDateIds);
+
+            if (dateErr) {
+                console.error(dateErr);
+                el.date.innerHTML = `<option value="">日期載入失敗</option>`;
+                el.tip.textContent = '';
+                return;
+            }
+
+            const mapDateLabel = new Map();
+            (dates || []).forEach(d => {
+                const label = new Date(d.date + 'T00:00:00').toLocaleDateString('zh-TW', {
+                    year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short',
+                });
+                mapDateLabel.set(String(d.id), label);
+            });
+
+            const dateOptions = myDateIds
+                .filter(id => mapDateLabel.has(id))
+                .sort((a, b) => (mapDateLabel.get(a) || '').localeCompare(mapDateLabel.get(b) || ''))
+                .map(id => `<option value="${id}">${mapDateLabel.get(id)}</option>`)
+                .join('');
+
+            el.date.innerHTML = `<option value="">請選擇日期</option>${dateOptions}`;
+            el.tip.textContent = '選擇日期後會自動查詢已上傳的班表';
+
+            el.date.addEventListener('change', () => {
+                const did = el.date.value;
+                if (!did) { el.result.innerHTML = ''; el.tip.textContent = ''; return; }
+                queryAndRender(did);
+            });
+
+            async function queryAndRender(matchDateId) {
+            el.result.innerHTML = '';
+            el.tip.textContent = '查詢班表中...';
+
+            const { data: rows, error } = await supabase
+                .from('matches')
+                .select('id, games_id, match_dates_id, locations_id, session, time, teams_id1, teams_id2, home_id, base1_id, base2_id, base3_id, recorder_id, supervisor_id, remark')
+                .eq('match_dates_id', matchDateId)
+                .eq('upload', true)
+                .order('locations_id', { ascending: true })
+                .order('time', { ascending: true });
+
+            if (error) {
+                console.error(error);
+                el.tip.textContent = '查詢失敗，請稍後再試';
+                return;
+            }
+            if (!rows || rows.length === 0) {
+                el.tip.textContent = '此日期尚未上傳班表，暫無法查看';
+                return;
+            }
+
+            const teamIds = new Set();
+            const userIds = new Set();
+            const locIds = new Set();
+            const gameIds = new Set();
+            const supIds = new Set();
+
+            rows.forEach(r => {
+                if (r.teams_id1) teamIds.add(r.teams_id1);
+                if (r.teams_id2) teamIds.add(r.teams_id2);
+                ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'].forEach(k => r[k] && userIds.add(r[k]));
+                if (r.supervisor_id) supIds.add(r.supervisor_id);
+                if (r.locations_id) locIds.add(r.locations_id);
+                if (r.games_id) gameIds.add(r.games_id);
+            });
+
+            const [tRes, pRes, lRes, gRes, sRes] = await Promise.all([
+                teamIds.size ? supabase.from('teams').select('id,name').in('id', Array.from(teamIds)) : Promise.resolve({ data: [] }),
+                userIds.size ? supabase.from('profiles').select('id,name').in('id', Array.from(userIds)) : Promise.resolve({ data: [] }),
+                locIds.size ? supabase.from('locations').select('id,name').in('id', Array.from(locIds)) : Promise.resolve({ data: [] }),
+                gameIds.size ? supabase.from('games').select('id,name').in('id', Array.from(gameIds)) : Promise.resolve({ data: [] }),
+                supIds.size ? supabase.from('supervisor').select('id,name').in('id', Array.from(supIds)) : Promise.resolve({ data: [] }),
+            ]);
+
+            const mapTeam = new Map((tRes.data || []).map(t => [String(t.id), t.name]));
+            const mapUser = new Map((pRes.data || []).map(p => [String(p.id), p.name]));
+            const mapLoc = new Map((lRes.data || []).map(l => [String(l.id), l.name]));
+            const mapSup = new Map((sRes.data || []).map(s => [String(s.id), s.name]));
+            const gameName = (gRes.data && gRes.data[0] && gRes.data[0].name) ? gRes.data[0].name : '';
+            const dateLabel = mapDateLabel.get(String(matchDateId)) || String(matchDateId);
+
+            const rowsByLoc = new Map();
+            rows.forEach(r => {
+                const lid = String(r.locations_id || '');
+                if (!rowsByLoc.has(lid)) rowsByLoc.set(lid, []);
+                rowsByLoc.get(lid).push(r);
+            });
+
+            const hasMe = r => [r.home_id, r.base1_id, r.base2_id, r.base3_id, r.recorder_id, r.supervisor_id]
+                .map(x => String(x || '')).includes(myId);
+
+            let anyOutput = false;
+            let html = '';
+
+            for (const [lid, list] of rowsByLoc.entries()) {
+                const listHasMe = list.some(hasMe);
+                if (!listHasMe) continue;
+
+                anyOutput = true;
+                const locName = mapLoc.get(lid) || ('場地ID:' + lid);
+
+                const supNames = [...new Set(
+                    list.map(r => r.supervisor_id).filter(Boolean).map(id => mapSup.get(String(id)) || '')
+                )].filter(Boolean);
+                const supervisorLine = supNames.length ? supNames.join('、') : '—';
+
+                const tbodyHtml = list.map(r => {
+                    const t1 = mapTeam.get(String(r.teams_id1)) || r.teams_id1 || '-';
+                    const t2 = mapTeam.get(String(r.teams_id2)) || r.teams_id2 || '-';
+                    const u = id => (id ? (mapUser.get(String(id)) || '') : '');
+                    const rowHasMe = hasMe(r);
+                    const clsMine = rowHasMe ? 'bg-amber-100 font-semibold text-blue-900' : '';
+
+                    return `
+                        <tr class="border-b ${clsMine}">
+                        <td class="px-4 py-2 text-center text-lg">${r.session || '-'}</td>
+                        <td class="px-4 py-2 text-center text-lg">${(r.time || '').slice(0, 5) || '-'}</td>
+                        <td class="px-4 py-2 text-center text-lg">${t1}</td>
+                        <td class="px-4 py-2 text-center text-lg">VS</td>
+                        <td class="px-4 py-2 text-center text-lg">${t2}</td>
+                        <td class="px-4 py-2 text-center text-lg">${u(r.home_id)}</td>
+                        <td class="px-4 py-2 text-center text-lg">${u(r.base1_id)}</td>
+                        <td class="px-4 py-2 text-center text-lg">${u(r.base2_id)}</td>
+                        <td class="px-4 py-2 text-center text-lg">${u(r.base3_id)}</td>
+                        <td class="px-4 py-2 text-center text-lg">${u(r.recorder_id)}</td>
+                        <td class="px-4 py-2 text-left text-lg">${r.remark || ''}</td>
+                        </tr>
+                        `;
+                }).join('');
+
+                html += `
+                    <div class="rounded-xl border border-blue-400 overflow-hidden shadow-md">
+                    <div class="bg-blue-100 px-4 py-3 font-bold text-xl text-center text-blue-900">
+                        ${dateLabel} ${gameName ? `｜ ${gameName}` : ''} ｜ 地點：${locName}
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-md bg-white text-center">
+                        <thead class="bg-blue-200 text-blue-900">
+                            <tr>
+                            <th class="px-3 py-2 border">場次</th>
+                            <th class="px-3 py-2 border">時間</th>
+                            <th class="px-3 py-2 border">先攻</th>
+                            <th class="px-3 py-2 border"></th>
+                            <th class="px-3 py-2 border">後攻</th>
+                            <th class="px-3 py-2 border">主審</th>
+                            <th class="px-3 py-2 border">一壘審</th>
+                            <th class="px-3 py-2 border">二壘審</th>
+                            <th class="px-3 py-2 border">三壘審</th>
+                            <th class="px-3 py-2 border">紀錄</th>
+                            <th class="px-3 py-2 border">備註</th>
+                            </tr>
+                        </thead>
+                        <tbody>${tbodyHtml}</tbody>
+                        </table>
+                    </div>
+                    <div class="px-4 py-4 bg-slate-100 text-center font-bold text-xl text-blue-800">
+                    監場：${supervisorLine}
+                    </div>
+                    </div>
+                    `;
+            }
+
+            if (!anyOutput) {
+                el.result.innerHTML = '';
+                el.tip.textContent = '此日期沒有屬於你的班，或尚未上傳。';
+                return;
+            }
+
+            el.result.innerHTML = html;
+            el.tip.textContent = '';
+        }
+
+        })();
 
     document.getElementById('logout-btn').addEventListener('click', function () {
         localStorage.removeItem('profile');
