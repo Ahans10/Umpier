@@ -450,7 +450,7 @@
                             <th class="border px-2 py-1">一壘審</th>
                             <th class="border px-2 py-1">二壘審</th>
                             <th class="border px-2 py-1">三壘審</th>
-                            <th class="border px-2 py-1">紀錄</th>
+                            <th class="border px-2 py-1">記錄</th>
                             <th class="border px-2 py-1">備註(比賽)</th>
                             </tr>
                         </thead>
@@ -542,7 +542,7 @@
                         if (conflictAt) {
                             select.value = '';
                             updateRowOptionLocks(tr);
-                            return alert('同一場的裁判/紀錄不可重複。');
+                            return alert('同一場的裁判/記錄不可重複。');
                         }
 
                         if (hasCrossVenueConflict(dateId, val, rowTime)) {
@@ -578,7 +578,7 @@
                     const seen = new Set();
                     for (const p of picks) {
                         if (seen.has(p.v)) {
-                            alert('同一場比賽的裁判不可重複指派（裁判/紀錄需為不同人）。\n請先修正再儲存/上傳。');
+                            alert('同一場比賽的裁判不可重複指派（裁判/記錄需為不同人）。\n請先修正再儲存/上傳。');
                             tr.querySelector(`select[name="${p.k}"]`)?.focus();
                             return;
                         }
@@ -592,8 +592,6 @@
                     if (Number.isNaN(h) || Number.isNaN(m)) return null;
                     return h * 60 + m;
                 }
-                function pad2(n) { return String(n).padStart(2, '0'); }
-                function fmtHM(min) { return `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`; }
                 function nameOf(uid) {
                     const opt = tbody.querySelector(`select[name$="_id"] option[value="${uid}"]`);
                     return opt ? opt.textContent.trim() : `ID:${uid}`;
@@ -608,7 +606,12 @@
                     const timeMin = hhmmToMinutes(timeText);
                     if (timeMin == null) return;
 
-                    matchMeta.set(matchId, { time: timeText, locName, session: tr.querySelector('td:nth-child(1)')?.textContent?.trim() || '' });
+                    matchMeta.set(matchId, {
+                        time: timeText,
+                        locId: String(locId),
+                        locName,
+                        session: tr.querySelector('td:nth-child(1)')?.textContent?.trim() || ''
+                    });
 
                     UNIQUE_KEYS.forEach(k => {
                         const uid = tr.querySelector(`select[name="${k}"]`)?.value || '';
@@ -638,7 +641,12 @@
 
                     if (!domMatchIds.has(mid)) {
                         const locNameOther = maps.locs.get(String(r.locations_id)) || `場地ID:${r.locations_id}`;
-                        matchMeta.set(mid, { time: timeText, locName: locNameOther, session: r.session || '' });
+                        matchMeta.set(mid, {
+                            time: timeText,
+                            locId: String(r.locations_id),
+                            locName: locNameOther,
+                            session: r.session || ''
+                        });
 
                         [r.home_id, r.base1_id, r.base2_id, r.base3_id, r.recorder_id]
                             .map(x => (x ? String(x) : ''))
@@ -654,12 +662,14 @@
                     recs.sort((a, b) => a.timeMin - b.timeMin);
                     for (let i = 0; i < recs.length; i++) {
                         for (let j = i + 1; j < recs.length; j++) {
+                            const m1 = matchMeta.get(recs[i].matchId);
+                            const m2 = matchMeta.get(recs[j].matchId);
+
+                            if (m1 && m2 && String(m1.locId) === String(m2.locId)) continue;
+
                             const dt = Math.abs(recs[i].timeMin - recs[j].timeMin);
                             if (dt < thresholdMinutes) {
-                                const m1 = matchMeta.get(recs[i].matchId);
-                                const m2 = matchMeta.get(recs[j].matchId);
                                 const pName = nameOf(uid);
-
                                 const m1Text = m1 ? `${m1.time}（場次:${(m1.session || '-')}）@ ${m1.locName}` : `比賽ID:${recs[i].matchId}`;
                                 const m2Text = m2 ? `${m2.time}（場次:${(m2.session || '-')}）@ ${m2.locName}` : `比賽ID:${recs[j].matchId}`;
 
