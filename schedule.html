@@ -298,28 +298,6 @@
                 }
             });
 
-            if (assignedProfileIds.size) {
-                const { data: plist } = await supabase
-                    .from('profiles')
-                    .select('id, name')
-                    .in('id', Array.from(assignedProfileIds));
-
-                (plist || []).forEach(p => {
-                    const pid = String(p.id);
-                    dateIds.forEach(didRaw => {
-                        const did = String(didRaw);
-                        if (!peopleByDate[did]) peopleByDate[did] = [];
-                        const exists = peopleByDate[did].some(x => String(x.id) === pid);
-                        if (!exists) {
-                            peopleByDate[did].push({
-                                id: pid,
-                                name: p.name
-                            });
-                        }
-                    });
-                });
-            }
-
             const BUFFER_MIN = 180;
 
             const { data: otherLocMatches, error: otherErr } = await supabase
