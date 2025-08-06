@@ -59,7 +59,7 @@
         </div>
 
         <div id="content-inner"
-            class="mt-8 max-w-3xl mx-auto bg-white/90 border border-blue-300 rounded-2xl shadow p-8 text-blue-900 flex flex-col gap-6">
+            class="mt-8 max-w-7xl mx-auto bg-white/90 border border-blue-300 rounded-2xl shadow p-8 text-blue-900 flex flex-col gap-6">
 
             <div id="content-area"></div>
 
@@ -98,11 +98,619 @@
 
     const contentArea = document.getElementById('content-area');
 
-    document.getElementById('btn-schedule').addEventListener('click', () => {
+    document.getElementById('btn-schedule').addEventListener('click', async () => {
         contentArea.innerHTML = `
-        <h2 class="text-2xl font-bold mb-6 text-center">班表</h2>
-        <p>這裡是排班表內容。</p>
+            <h2 class="text-2xl font-bold mb-6 text-center">排班</h2>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end mb-6">
+            <div>
+                <label class="block font-semibold mb-2">賽事</label>
+                <select id="sch-game" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                <option value="">載入中...</option>
+                </select>
+            </div>
+            <div>
+                <label class="block font-semibold mb-2">地點</label>
+                <select id="sch-loc" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                <option value="">載入中...</option>
+                </select>
+            </div>
+            <div>
+                <button id="btn-sch-query" class="w-full px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">查詢賽程</button>
+            </div>
+            </div>
+
+            <div id="sch-tip" class="text-sm text-blue-700 mb-2"></div>
+            <div id="sch-result" class="space-y-10"></div>
         `;
+
+        const el = {
+            game: document.getElementById('sch-game'),
+            loc: document.getElementById('sch-loc'),
+            btn: document.getElementById('btn-sch-query'),
+            tip: document.getElementById('sch-tip'),
+            result: document.getElementById('sch-result'),
+        };
+
+        const maps = {
+            games: new Map(),
+            locs: new Map(),
+            dates: new Map(),
+            datesLabel: new Map(),
+            teams: new Map(),
+        };
+        const getNote = (p) => (p?.note ?? p?.remark ?? '');
+
+        function attachNotePreview(selectEl) {
+            const holder = document.createElement('div');
+            holder.className = 'text-xs text-slate-600 mt-1 h-4';
+            const update = () => {
+                const opt = selectEl.options[selectEl.selectedIndex];
+                const note = opt ? (opt.getAttribute('data-note') || '') : '';
+                holder.textContent = note ? `備註：${note}` : '';
+            };
+            selectEl.addEventListener('change', update);
+            update();
+            selectEl.parentElement.appendChild(holder);
+        }
+
+        function makePersonOptions(people, selectedId) {
+            const opts = ['<option value=""></option>'];
+            people.forEach(p => {
+                const sel = String(p.id) === String(selectedId) ? 'selected' : '';
+                const safeNote = (getNote(p) || '').replace(/"/g, '&quot;');
+                opts.push(
+                    `<option value="${p.id}" ${sel} title="${p.name}${safeNote ? '：' + safeNote : ''}" data-note="${safeNote}">${p.name}</option>`
+                );
+            });
+            return opts.join('');
+        }
+
+        async function loadStaticOptions() {
+            el.tip.textContent = '載入選項中...';
+            const [gamesRes, locsRes, datesRes] = await Promise.all([
+                supabase.from('games').select('id, name').order('name'),
+                supabase.from('locations').select('id, name').order('name'),
+                supabase.from('match_dates').select('id, date').order('date')
+            ]);
+
+            if (!gamesRes.error) {
+                const gs = gamesRes.data || [];
+                el.game.innerHTML = `<option value="">請選擇賽事</option>` +
+                    gs.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                maps.games.clear(); gs.forEach(g => maps.games.set(String(g.id), g.name));
+            } else {
+                el.game.innerHTML = `<option value="">載入賽事失敗</option>`;
+            }
+
+            if (!locsRes.error) {
+                const ls = locsRes.data || [];
+                el.loc.innerHTML = `<option value="">請選擇地點</option>` +
+                    ls.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+                maps.locs.clear(); ls.forEach(l => maps.locs.set(String(l.id), l.name));
+            } else {
+                el.loc.innerHTML = `<option value="">載入地點失敗</option>`;
+            }
+
+            if (!datesRes.error) {
+                maps.dates.clear(); maps.datesLabel.clear();
+                (datesRes.data || []).forEach(d => {
+                    const iso = String(d.date).slice(0, 10);
+                    maps.dates.set(String(d.id), iso);
+                    const label = new Date(d.date).toLocaleDateString('zh-TW', {
+                        year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
+                    });
+                    maps.datesLabel.set(String(d.id), label);
+                });
+            }
+            el.tip.textContent = '';
+        }
+        await loadStaticOptions();
+
+        el.btn.addEventListener('click', async () => {
+            const gameId = el.game.value;
+            const locId = el.loc.value;
+            if (!gameId || !locId) return alert('請選擇賽事與地點');
+
+            el.result.innerHTML = '';
+            el.tip.textContent = '查詢中...';
+
+            const { data: rows, error } = await supabase
+                .from('matches')
+                .select('id, games_id, match_dates_id, locations_id, session, time, teams_id1, teams_id2, home_id, base1_id, base2_id, base3_id, recorder_id, supervisor_id, remark, upload')
+                .eq('games_id', gameId)
+                .eq('locations_id', locId);
+
+            if (error) {
+                console.error(error);
+                el.tip.textContent = '查詢失敗，請稍後再試';
+                return;
+            }
+            if (!rows || rows.length === 0) {
+                el.tip.textContent = '沒有資料。';
+                return;
+            }
+
+            const teamIds = new Set();
+            const assignedProfileIds = new Set();
+            rows.forEach(r => {
+                if (r.teams_id1) teamIds.add(r.teams_id1);
+                if (r.teams_id2) teamIds.add(r.teams_id2);
+                ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id', 'supervisor_id'].forEach(k => {
+                    if (r[k]) assignedProfileIds.add(r[k]);
+                });
+            });
+            if (teamIds.size) {
+                const { data: tlist } = await supabase
+                    .from('teams')
+                    .select('id, name')
+                    .in('id', Array.from(teamIds));
+                (tlist || []).forEach(t => maps.teams.set(String(t.id), t.name));
+            }
+
+            const dateIds = [...new Set(rows.map(r => r.match_dates_id))];
+
+            const { data: regs, error: regsErr } = await supabase
+                .from('registrations')
+                .select('user_id, match_date_id, description')
+                .in('match_date_id', dateIds);
+
+            if (regsErr) {
+                console.error('registrations 查詢失敗', regsErr);
+            }
+
+            const peopleByDate = {};
+            const userIds = Array.from(new Set((regs || []).map(r => r.user_id)));
+
+            let profileMap = new Map();
+            if (userIds.length) {
+                const { data: profs, error: profErr } = await supabase
+                    .from('profiles')
+                    .select('id, name')
+                    .in('id', userIds);
+
+                if (!profErr) {
+                    profs.forEach(p => {
+                        profileMap.set(String(p.id), {
+                            id: String(p.id),
+                            name: p.name
+                        });
+                    });
+                }
+            }
+
+            (regs || []).forEach(r => {
+                const uid = String(r.user_id);
+                const p = profileMap.get(uid);
+                if (!p) return;
+                const did = String(r.match_date_id);
+                if (!peopleByDate[did]) peopleByDate[did] = [];
+                const exist = peopleByDate[did].find(x => String(x.id) === p.id);
+                const regNote = (r.description || '').trim();
+                if (!exist) {
+                    peopleByDate[did].push({
+                        id: p.id,
+                        name: p.name,
+                        note: regNote
+                    });
+                } else {
+                    const setNotes = new Set([exist.note, regNote].filter(Boolean));
+                    exist.note = Array.from(setNotes).join(' / ');
+                }
+            });
+
+            if (assignedProfileIds.size) {
+                const { data: plist } = await supabase
+                    .from('profiles')
+                    .select('id, name')
+                    .in('id', Array.from(assignedProfileIds));
+
+                (plist || []).forEach(p => {
+                    const pid = String(p.id);
+                    dateIds.forEach(didRaw => {
+                        const did = String(didRaw);
+                        if (!peopleByDate[did]) peopleByDate[did] = [];
+                        const exists = peopleByDate[did].some(x => String(x.id) === pid);
+                        if (!exists) {
+                            peopleByDate[did].push({
+                                id: pid,
+                                name: p.name
+                            });
+                        }
+                    });
+                });
+            }
+
+            const BUFFER_MIN = 180;
+
+            const { data: otherLocMatches, error: otherErr } = await supabase
+                .from('matches')
+                .select('id, games_id, match_dates_id, locations_id, time, home_id, base1_id, base2_id, base3_id, recorder_id')
+                .in('match_dates_id', dateIds)
+                .neq('locations_id', locId);
+
+            if (otherErr) console.error('cross-venue 查詢失敗', otherErr);
+
+            const conflictIndex = new Map();
+            function hhmmToMin(hhmm) {
+                const [h, m] = String(hhmm || '').slice(0, 5).split(':').map(Number);
+                return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null;
+            }
+            (otherLocMatches || []).forEach(m => {
+                const tmin = hhmmToMin(m.time);
+                if (tmin == null) return;
+                const did = String(m.match_dates_id);
+                if (!conflictIndex.has(did)) conflictIndex.set(did, new Map());
+                const mp = conflictIndex.get(did);
+                ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'].forEach(k => {
+                    const pid = m[k];
+                    if (!pid) return;
+                    const key = String(pid);
+                    const arr = mp.get(key) || [];
+                    arr.push(tmin);
+                    mp.set(key, arr);
+                });
+            });
+
+            function hasCrossVenueConflict(dateId, profileId, hhmm) {
+                if (!profileId) return false;
+                const t = hhmmToMin(hhmm);
+                if (t == null) return false;
+                const mp = conflictIndex.get(String(dateId));
+                if (!mp) return false;
+                const arr = mp.get(String(profileId));
+                if (!arr) return false;
+                return arr.some(tt => Math.abs(tt - t) < BUFFER_MIN);
+            }
+
+            const { data: supervisors, error: supErr } = await supabase
+                .from('supervisor')
+                .select('id, name')
+                .order('name', { ascending: true });
+
+            if (supErr) {
+                console.error('supervisor 查詢失敗', supErr);
+            }
+
+            const byDate = {};
+            rows.forEach(r => {
+                const d = String(r.match_dates_id);
+                if (!byDate[d]) byDate[d] = [];
+                byDate[d].push(r);
+            });
+
+            const dateKeys = Object.keys(byDate).sort((a, b) => {
+                const sa = maps.dates.get(a) || '';
+                const sb = maps.dates.get(b) || '';
+                return sa.localeCompare(sb);
+            });
+            dateKeys.forEach(d => byDate[d].sort((a, b) => (a.time || '').localeCompare(b.time || '')));
+
+            const gameName = maps.games.get(String(gameId)) || '';
+            const locName = maps.locs.get(String(locId)) || '';
+
+            el.result.innerHTML = dateKeys.map(did => {
+                const list = byDate[did];
+                const dLabel = maps.datesLabel.get(String(did)) || maps.dates.get(String(did)) || '';
+
+                const daySupervisorId = (list.find(x => !!x.supervisor_id)?.supervisor_id) || '';
+                const people = peopleByDate[did] || [];
+
+                const supOpts = makePersonOptions(
+                    (supervisors || []).map(s => ({ id: String(s.id), name: s.name })),
+                    String(daySupervisorId || '')
+                );
+
+                const body = list.map(r => {
+                    const t1 = maps.teams.get(String(r.teams_id1)) || r.teams_id1 || '-';
+                    const t2 = maps.teams.get(String(r.teams_id2)) || r.teams_id2 || '-';
+                    const selHome = makePersonOptions(people, r.home_id);
+                    const selB1 = makePersonOptions(people, r.base1_id);
+                    const selB2 = makePersonOptions(people, r.base2_id);
+                    const selB3 = makePersonOptions(people, r.base3_id);
+                    const selRec = makePersonOptions(people, r.recorder_id);
+
+                    return `
+                        <tr data-id="${r.id}" data-time="${(r.time || '').slice(0, 5)}">
+                            <td class="border px-2 py-1 text-center">${r.session || '-'}</td>
+                            <td class="border px-2 py-1 text-center whitespace-nowrap">${(r.time || '').slice(0, 5) || '-'}</td>
+                            <td class="border px-2 py-1 text-center">${t1}</td>
+                            <td class="border px-2 py-1 text-center">VS</td>
+                            <td class="border px-2 py-1 text-center">${t2}</td>
+
+                            <td class="border px-2 py-1"><select name="home_id"     class="w-full border rounded px-2 py-1">${selHome}</select></td>
+                            <td class="border px-2 py-1"><select name="base1_id"    class="w-full border rounded px-2 py-1">${selB1}</select></td>
+                            <td class="border px-2 py-1"><select name="base2_id"    class="w-full border rounded px-2 py-1">${selB2}</select></td>
+                            <td class="border px-2 py-1"><select name="base3_id"    class="w-full border rounded px-2 py-1">${selB3}</select></td>
+                            <td class="border px-2 py-1"><select name="recorder_id" class="w-full border rounded px-2 py-1">${selRec}</select></td>
+
+                            <td class="border px-2 py-1">
+                            <input name="remark" type="text" class="w-full border rounded px-2 py-1" value="${r.remark ?? ''}">
+                            </td>
+                        </tr>
+                        `;
+                }).join('');
+
+                return `
+                    <div class="rounded-xl border border-blue-300 overflow-hidden">
+                    <div class="bg-blue-50 px-4 py-3 font-semibold text-center">
+                        ${dLabel} ｜ ${gameName} ｜ 地點：${locName}
+                    </div>
+
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm bg-white text-center">
+                        <thead class="bg-blue-100 text-blue-800">
+                            <tr>
+                            <th class="border px-2 py-1">場次</th>
+                            <th class="border px-2 py-1">時間</th>
+                            <th class="border px-2 py-1">先攻</th>
+                            <th class="border px-2 py-1">VS</th>
+                            <th class="border px-2 py-1">後攻</th>
+                            <th class="border px-2 py-1">主審</th>
+                            <th class="border px-2 py-1">一壘審</th>
+                            <th class="border px-2 py-1">二壘審</th>
+                            <th class="border px-2 py-1">三壘審</th>
+                            <th class="border px-2 py-1">紀錄</th>
+                            <th class="border px-2 py-1">備註(比賽)</th>
+                            </tr>
+                        </thead>
+                        <tbody data-date="${did}">
+                            ${body}
+                        </tbody>
+                        </table>
+                    </div>
+
+                    <div class="px-4 py-3 border-t bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex items-center gap-3">
+                        <label class="font-semibold">監場：</label>
+                        <select class="day-supervisor w-60 border rounded px-2 py-1" data-date="${did}">
+                            ${supOpts}
+                        </select>
+                        </div>
+                        <div class="flex gap-3">
+                        <button class="btn-save-day px-4 py-2 bg-green-600 text-white rounded" data-date="${did}">儲存</button>
+                        <button class="btn-upload-day px-4 py-2 bg-blue-600 text-white rounded" data-date="${did}">上傳</button>
+                        </div>
+                    </div>
+                    </div>
+                `;
+            }).join('');
+
+            el.result.querySelectorAll('select[name$="_id"]').forEach(attachNotePreview);
+            el.result.querySelectorAll('.day-supervisor').forEach(attachNotePreview);
+
+            const UNIQUE_KEYS = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
+
+            function getRowSelections(tr) {
+                const sel = {};
+                UNIQUE_KEYS.forEach(k => {
+                    const el = tr.querySelector(`select[name="${k}"]`);
+                    sel[k] = el ? (el.value || '') : '';
+                });
+                return sel;
+            }
+
+            function updateRowOptionLocks(tr) {
+                const chosen = new Set(
+                    UNIQUE_KEYS
+                        .map(k => tr.querySelector(`select[name="${k}"]`)?.value)
+                        .filter(v => !!v)
+                );
+
+                const tbody = tr.closest('tbody');
+                const dateId = tbody?.getAttribute('data-date');
+                const rowTime = tr.getAttribute('data-time');
+
+                UNIQUE_KEYS.forEach(k => {
+                    const select = tr.querySelector(`select[name="${k}"]`);
+                    if (!select) return;
+
+                    Array.from(select.options).forEach(opt => opt.disabled = false);
+
+                    Array.from(select.options).forEach(opt => {
+                        if (!opt.value) return;
+
+                        const duplicateInRow = chosen.has(opt.value) && opt.value !== select.value;
+                        const crossVenue = hasCrossVenueConflict(dateId, opt.value, rowTime);
+
+                        if (duplicateInRow || crossVenue) {
+                            if (opt.value !== select.value) opt.disabled = true;
+                        }
+                    });
+                });
+            }
+
+            function attachUniqueHandlersToRow(tr) {
+                const tbody = tr.closest('tbody');
+                const dateId = tbody?.getAttribute('data-date');
+                const rowTime = tr.getAttribute('data-time');
+
+                UNIQUE_KEYS.forEach(k => {
+                    const select = tr.querySelector(`select[name="${k}"]`);
+                    if (!select) return;
+
+                    select.addEventListener('change', () => {
+                        const val = select.value || '';
+                        if (!val) { updateRowOptionLocks(tr); return; }
+
+                        let conflictAt = '';
+                        UNIQUE_KEYS.forEach(other => {
+                            if (other === k) return;
+                            const otherSel = tr.querySelector(`select[name="${other}"]`);
+                            if (otherSel && otherSel.value && otherSel.value === val) conflictAt = other;
+                        });
+                        if (conflictAt) {
+                            select.value = '';
+                            updateRowOptionLocks(tr);
+                            return alert('同一場的裁判/紀錄不可重複。');
+                        }
+
+                        if (hasCrossVenueConflict(dateId, val, rowTime)) {
+                            select.value = '';
+                            updateRowOptionLocks(tr);
+                            return alert(`同一天其他場地在 ${rowTime}（±${BUFFER_MIN} 分）已有該人員的指派。`);
+                        }
+
+                        updateRowOptionLocks(tr);
+                    });
+                });
+
+                updateRowOptionLocks(tr);
+            }
+
+            el.result.querySelectorAll('tbody tr[data-id]').forEach(tr => attachUniqueHandlersToRow(tr));
+
+            async function saveOneDay(dateId, uploadFlag) {
+                const thresholdMinutes = 180;
+
+                const tbody = el.result.querySelector(`tbody[data-date="${dateId}"]`);
+                const supervisorSel = el.result.querySelector(`.day-supervisor[data-date="${dateId}"]`);
+                const supervisor_id = supervisorSel ? (supervisorSel.value || null) : null;
+
+                const trs = tbody.querySelectorAll('tr[data-id]');
+
+                for (const tr of trs) {
+                    const picks = [];
+                    UNIQUE_KEYS.forEach(k => {
+                        const v = tr.querySelector(`select[name="${k}"]`)?.value || '';
+                        if (v) picks.push({ k, v });
+                    });
+                    const seen = new Set();
+                    for (const p of picks) {
+                        if (seen.has(p.v)) {
+                            alert('同一場比賽的裁判不可重複指派（裁判/紀錄需為不同人）。\n請先修正再儲存/上傳。');
+                            tr.querySelector(`select[name="${p.k}"]`)?.focus();
+                            return;
+                        }
+                        seen.add(p.v);
+                    }
+                }
+
+                function hhmmToMinutes(hhmm) {
+                    if (!hhmm || !/^\d{2}:\d{2}/.test(hhmm)) return null;
+                    const [h, m] = hhmm.split(':').map(n => parseInt(n, 10));
+                    if (Number.isNaN(h) || Number.isNaN(m)) return null;
+                    return h * 60 + m;
+                }
+                function pad2(n) { return String(n).padStart(2, '0'); }
+                function fmtHM(min) { return `${pad2(Math.floor(min / 60))}:${pad2(min % 60)}`; }
+                function nameOf(uid) {
+                    const opt = tbody.querySelector(`select[name$="_id"] option[value="${uid}"]`);
+                    return opt ? opt.textContent.trim() : `ID:${uid}`;
+                }
+
+                const matchMeta = new Map();
+                const currentDayAssignments = new Map();
+
+                trs.forEach(tr => {
+                    const matchId = tr.getAttribute('data-id');
+                    const timeText = tr.getAttribute('data-time') || tr.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
+                    const timeMin = hhmmToMinutes(timeText);
+                    if (timeMin == null) return;
+
+                    matchMeta.set(matchId, { time: timeText, locName, session: tr.querySelector('td:nth-child(1)')?.textContent?.trim() || '' });
+
+                    UNIQUE_KEYS.forEach(k => {
+                        const uid = tr.querySelector(`select[name="${k}"]`)?.value || '';
+                        if (!uid) return;
+                        if (!currentDayAssignments.has(uid)) currentDayAssignments.set(uid, []);
+                        currentDayAssignments.get(uid).push({ matchId, timeMin, source: 'DOM' });
+                    });
+                });
+
+                const { data: otherMatches, error: otherErr } = await supabase
+                    .from('matches')
+                    .select('id, locations_id, session, time, home_id, base1_id, base2_id, base3_id, recorder_id')
+                    .eq('match_dates_id', dateId);
+
+                if (otherErr) {
+                    console.error('查詢同日其他場地失敗', otherErr);
+                    alert('查詢同日其他場地失敗，請稍後再試');
+                    return;
+                }
+
+                const domMatchIds = new Set(Array.from(trs).map(tr => tr.getAttribute('data-id')));
+                (otherMatches || []).forEach(r => {
+                    const mid = String(r.id);
+                    const timeText = (r.time || '').slice(0, 5);
+                    const timeMin = hhmmToMinutes(timeText);
+                    if (timeMin == null) return;
+
+                    if (!domMatchIds.has(mid)) {
+                        const locNameOther = maps.locs.get(String(r.locations_id)) || `場地ID:${r.locations_id}`;
+                        matchMeta.set(mid, { time: timeText, locName: locNameOther, session: r.session || '' });
+
+                        [r.home_id, r.base1_id, r.base2_id, r.base3_id, r.recorder_id]
+                            .map(x => (x ? String(x) : ''))
+                            .filter(Boolean)
+                            .forEach(uid => {
+                                if (!currentDayAssignments.has(uid)) currentDayAssignments.set(uid, []);
+                                currentDayAssignments.get(uid).push({ matchId: mid, timeMin, source: 'DB' });
+                            });
+                    }
+                });
+
+                for (const [uid, recs] of currentDayAssignments.entries()) {
+                    recs.sort((a, b) => a.timeMin - b.timeMin);
+                    for (let i = 0; i < recs.length; i++) {
+                        for (let j = i + 1; j < recs.length; j++) {
+                            const dt = Math.abs(recs[i].timeMin - recs[j].timeMin);
+                            if (dt < thresholdMinutes) {
+                                const m1 = matchMeta.get(recs[i].matchId);
+                                const m2 = matchMeta.get(recs[j].matchId);
+                                const pName = nameOf(uid);
+
+                                const m1Text = m1 ? `${m1.time}（場次:${(m1.session || '-')}）@ ${m1.locName}` : `比賽ID:${recs[i].matchId}`;
+                                const m2Text = m2 ? `${m2.time}（場次:${(m2.session || '-')}）@ ${m2.locName}` : `比賽ID:${recs[j].matchId}`;
+
+                                alert(
+                                    `【跨場地時間衝突】\n` +
+                                    `裁判：${pName}\n` +
+                                    `${m1Text}\n` +
+                                    `與\n` +
+                                    `${m2Text}\n` +
+                                    `開賽時間相差小於 ${thresholdMinutes} 分鐘，請調整人員或時間後再儲存/上傳。`
+                                );
+                                return;
+                            }
+                        }
+                    }
+                }
+
+                const updates = [];
+                trs.forEach(tr => {
+                    const id = tr.getAttribute('data-id');
+                    const payload = { upload: uploadFlag, supervisor_id };
+                    ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'].forEach(k => {
+                        const sel = tr.querySelector(`select[name="${k}"]`);
+                        payload[k] = sel ? (sel.value || null) : null;
+                    });
+                    const remark = tr.querySelector('input[name="remark"]')?.value ?? null;
+                    payload.remark = (remark && remark.trim()) ? remark.trim() : null;
+                    updates.push({ id, payload });
+                });
+
+                for (const u of updates) {
+                    const { error: updErr } = await supabase.from('matches').update(u.payload).eq('id', u.id);
+                    if (updErr) {
+                        console.error('更新失敗', u, updErr);
+                        alert('部分資料更新失敗，請稍後再試');
+                        return;
+                    }
+                }
+
+                alert(uploadFlag ? '上傳完成！(已將本日裁判表上傳至裁判員頁面)' : '儲存完成！');
+            }
+
+            el.result.querySelectorAll('.btn-save-day').forEach(btn => {
+                btn.addEventListener('click', () => saveOneDay(btn.getAttribute('data-date'), false));
+            });
+            el.result.querySelectorAll('.btn-upload-day').forEach(btn => {
+                btn.addEventListener('click', () => saveOneDay(btn.getAttribute('data-date'), true));
+            });
+
+            el.tip.textContent = `共 ${rows.length} 場比賽。`;
+        });
     });
 
     document.getElementById('btn-view-registrations').addEventListener('click', async () => {
@@ -344,95 +952,95 @@
         document.getElementById('query-type').addEventListener('change', function () {
             loadQuerySection(this.value);
         });
-        
+
     });
-        async function editRemarkByRow(index) {
-            const row = window.latestDateRegData[index];
-            const oldRemark = row.description || '';
-            const newRemark = prompt('請輸入新的備註：', oldRemark);
-            if (newRemark === null) return;
+    async function editRemarkByRow(index) {
+        const row = window.latestDateRegData[index];
+        const oldRemark = row.description || '';
+        const newRemark = prompt('請輸入新的備註：', oldRemark);
+        if (newRemark === null) return;
 
-            const { error } = await supabase
-                .from('registrations')
-                .update({ description: newRemark })
-                .match({
-                    user_id: row.user_id,
-                    match_date_id: row.match_date_id
-                });
-
-            if (error) {
-                alert('更新失敗，請稍後再試');
-            } else {
-                alert('更新成功');
-                document.getElementById('date-select').dispatchEvent(new Event('change'));
-            }
-        }
-        async function deleteRegistrationByRow(index) {
-            const row = window.latestDateRegData[index];
-            const confirmDelete = confirm(`確定要刪除 ${row.profiles.name} 的報名紀錄嗎？`);
-            if (!confirmDelete) return;
-
-            const { error } = await supabase
-                .from('registrations')
-                .delete()
-                .match({
-                    user_id: row.user_id,
-                    match_date_id: row.match_date_id
-                });
-
-            if (error) {
-                alert('刪除失敗，請稍後再試');
-            } else {
-                alert('刪除成功');
-                document.getElementById('date-select').dispatchEvent(new Event('change'));
-            }
-        }
-        async function editRemark(index) {
-            const row = window.latestUserRegData[index];
-            const oldRemark = row.description || '';
-            const newRemark = prompt('請輸入新的備註：', oldRemark);
-            if (newRemark === null) return;
-            console.log('Updating...', {
+        const { error } = await supabase
+            .from('registrations')
+            .update({ description: newRemark })
+            .match({
                 user_id: row.user_id,
-                match_date_id: row.match_date_id,
-                description: newRemark
+                match_date_id: row.match_date_id
             });
 
-            const { error } = await supabase
-                .from('registrations')
-                .update({ description: newRemark })
-                .match({
-                    user_id: row.user_id,
-                    match_date_id: row.match_date_id
-                });
-
-            if (error) {
-                alert('更新失敗，請稍後再試');
-            } else {
-                alert('更新成功');
-                document.getElementById('user-select').dispatchEvent(new Event('change')); // 重新載入
-            }
+        if (error) {
+            alert('更新失敗，請稍後再試');
+        } else {
+            alert('更新成功');
+            document.getElementById('date-select').dispatchEvent(new Event('change'));
         }
-        async function deleteRegistration(index) {
-            const row = window.latestUserRegData[index];
-            const confirmDelete = confirm(`確定要刪除報名日期：${new Date(row.match_dates.date).toLocaleDateString('zh-TW')} 的紀錄嗎？`);
-            if (!confirmDelete) return;
+    }
+    async function deleteRegistrationByRow(index) {
+        const row = window.latestDateRegData[index];
+        const confirmDelete = confirm(`確定要刪除 ${row.profiles.name} 的報名紀錄嗎？`);
+        if (!confirmDelete) return;
 
-            const { error } = await supabase
-                .from('registrations')
-                .delete()
-                .match({
-                    user_id: row.user_id,
-                    match_date_id: row.match_date_id
-                });
+        const { error } = await supabase
+            .from('registrations')
+            .delete()
+            .match({
+                user_id: row.user_id,
+                match_date_id: row.match_date_id
+            });
 
-            if (error) {
-                alert('刪除失敗，請稍後再試');
-            } else {
-                alert('刪除成功');
-                document.getElementById('user-select').dispatchEvent(new Event('change')); // 重新載入資料
-            }
+        if (error) {
+            alert('刪除失敗，請稍後再試');
+        } else {
+            alert('刪除成功');
+            document.getElementById('date-select').dispatchEvent(new Event('change'));
         }
+    }
+    async function editRemark(index) {
+        const row = window.latestUserRegData[index];
+        const oldRemark = row.description || '';
+        const newRemark = prompt('請輸入新的備註：', oldRemark);
+        if (newRemark === null) return;
+        console.log('Updating...', {
+            user_id: row.user_id,
+            match_date_id: row.match_date_id,
+            description: newRemark
+        });
+
+        const { error } = await supabase
+            .from('registrations')
+            .update({ description: newRemark })
+            .match({
+                user_id: row.user_id,
+                match_date_id: row.match_date_id
+            });
+
+        if (error) {
+            alert('更新失敗，請稍後再試');
+        } else {
+            alert('更新成功');
+            document.getElementById('user-select').dispatchEvent(new Event('change')); // 重新載入
+        }
+    }
+    async function deleteRegistration(index) {
+        const row = window.latestUserRegData[index];
+        const confirmDelete = confirm(`確定要刪除報名日期：${new Date(row.match_dates.date).toLocaleDateString('zh-TW')} 的紀錄嗎？`);
+        if (!confirmDelete) return;
+
+        const { error } = await supabase
+            .from('registrations')
+            .delete()
+            .match({
+                user_id: row.user_id,
+                match_date_id: row.match_date_id
+            });
+
+        if (error) {
+            alert('刪除失敗，請稍後再試');
+        } else {
+            alert('刪除成功');
+            document.getElementById('user-select').dispatchEvent(new Event('change')); // 重新載入資料
+        }
+    }
 
     document.getElementById('btn-add-match-date').addEventListener('click', async () => {
         contentArea.innerHTML = `
@@ -842,7 +1450,7 @@
                             </td>
                         </tr>
                         `;
-            }).join('');
+                }).join('');
 
                 return `
                     <div class="rounded-xl border border-blue-300 overflow-hidden">
