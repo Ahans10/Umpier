@@ -459,19 +459,22 @@
                         </tbody>
                         </table>
                     </div>
-
                     <div class="px-4 py-3 border-t bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                         <div class="flex items-center gap-3">
-                        <label class="font-semibold">監場：</label>
-                        <select class="day-supervisor w-60 border rounded px-2 py-1" data-date="${did}">
+                            <label class="font-semibold">監場：</label>
+                            <select class="day-supervisor w-60 border rounded px-2 py-1" data-date="${did}">
                             ${supOpts}
-                        </select>
+                            </select>
                         </div>
-                        <div class="flex gap-3">
-                        <button class="btn-save-day px-4 py-2 bg-green-600 text-white rounded" data-date="${did}">儲存</button>
-                        <button class="btn-upload-day px-4 py-2 bg-blue-600 text-white rounded" data-date="${did}">上傳</button>
+                        <div class="flex items-center gap-4">
+                            <div class="text-sm ${list.every(x => x.upload) ? 'text-green-600' : 'text-red-600'} font-medium">
+                            ${list.every(x => x.upload) ? '✔ 已上傳' : '✘ 尚未上傳'}
+                            </div>
+                            <div class="flex gap-3">
+                            <button class="btn-save-day px-4 py-2 bg-green-600 text-white rounded" data-date="${did}">儲存/取消上傳</button>
+                            <button class="btn-upload-day px-4 py-2 bg-blue-600 text-white rounded" data-date="${did}">上傳</button>
+                            </div>
                         </div>
-                    </div>
                     </div>
                 `;
             }).join('');
@@ -709,7 +712,8 @@
                     }
                 }
 
-                alert(uploadFlag ? '上傳完成！(已將本日裁判表上傳至裁判員頁面)' : '儲存完成！');
+                alert(uploadFlag ? '上傳完成！(已將本日裁判表上傳至裁判員頁面)' : '儲存/取消上傳成功！');
+                el.btn.click();
             }
 
             el.result.querySelectorAll('.btn-save-day').forEach(btn => {
