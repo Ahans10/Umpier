@@ -250,17 +250,17 @@
 
                     return `
                         <tr class="border-b ${clsMine}">
-                        <td class="px-4 py-2 text-center text-lg">${r.session || '-'}</td>
-                        <td class="px-4 py-2 text-center text-lg">${(r.time || '').slice(0, 5) || '-'}</td>
-                        <td class="px-4 py-2 text-center text-lg">${t1}</td>
-                        <td class="px-4 py-2 text-center text-lg">VS</td>
-                        <td class="px-4 py-2 text-center text-lg">${t2}</td>
-                        <td class="px-4 py-2 text-center text-lg">${u(r.home_id)}</td>
-                        <td class="px-4 py-2 text-center text-lg">${u(r.base1_id)}</td>
-                        <td class="px-4 py-2 text-center text-lg">${u(r.base2_id)}</td>
-                        <td class="px-4 py-2 text-center text-lg">${u(r.base3_id)}</td>
-                        <td class="px-4 py-2 text-center text-lg">${u(r.recorder_id)}</td>
-                        <td class="px-4 py-2 text-left text-lg">${r.remark || ''}</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">${r.session || '-'}</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">${(r.time || '').slice(0, 5) || '-'}</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">${t1}</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">VS</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">${t2}</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">${u(r.home_id)}</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">${u(r.base1_id)}</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">${u(r.base2_id)}</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">${u(r.base3_id)}</td>
+                        <td class="px-4 py-2 border-2 text-center text-lg">${u(r.recorder_id)}</td>
+                        <td class="px-4 py-2 border-2 text-left text-lg">${r.remark || ''}</td>
                         </tr>
                         `;
                 }).join('');
