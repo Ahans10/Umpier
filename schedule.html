@@ -545,7 +545,7 @@
 
                             const opt = document.createElement('option');
                             opt.value = `guest:${row.id || 'from-db'}`;
-                            opt.textContent = `【臨時】${row.guest_name}`;
+                            opt.textContent = `*${row.guest_name}`;
                             if (row.guest_note) opt.setAttribute('data-note', row.guest_note);
 
                             const addOpt = Array.from(sel.options).find(o => o.value === GUEST_ADD_VALUE);
@@ -602,7 +602,7 @@
 
                         const opt = document.createElement('option');
                         opt.value = `${GUEST_PREFIX}${gid}`;
-                        opt.textContent = `【臨時】${name}`;
+                        opt.textContent = `*${name}`;
                         opt.setAttribute('data-note', note);
                         const addOpt = Array.from(select.options).find(o => o.value === GUEST_ADD_VALUE);
                         if (addOpt) select.insertBefore(opt, addOpt); else select.appendChild(opt);
