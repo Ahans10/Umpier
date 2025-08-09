@@ -229,7 +229,7 @@
                 const mapUser = new Map((pRes.data || []).map(p => [String(p.id), p.name]));
                 const mapLoc = new Map((lRes.data || []).map(l => [String(l.id), l.name]));
                 const mapSup = new Map((sRes.data || []).map(s => [String(s.id), s.name]));
-                const gameName = (gRes.data && gRes.data[0] && gRes.data[0].name) ? gRes.data[0].name : '';
+                const mapGame = new Map((gRes.data || []).map(g => [String(g.id), g.name]));
                 const dateLabel = mapDateLabel.get(String(matchDateId)) || String(matchDateId);
 
                 const rowsByLoc = new Map();
@@ -258,6 +258,17 @@
 
                     anyOutput = true;
                     const locName = mapLoc.get(lid) || ('場地ID:' + lid);
+
+                    const gameNames = [...new Set(
+                        list
+                            .map(r => mapGame.get(String(r.games_id)) || '')
+                            .filter(Boolean)
+                    )];
+                    const gameName = gameNames.length === 1
+                        ? gameNames[0]
+                        : gameNames.length > 1
+                            ? gameNames.join('、')
+                            : '';
 
                     const supNames = [...new Set(
                         list.map(r => r.supervisor_id).filter(Boolean).map(id => mapSup.get(String(id)) || '')
