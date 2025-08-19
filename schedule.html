@@ -181,7 +181,7 @@
             const update = () => {
                 const opt = selectEl.options[selectEl.selectedIndex];
                 const note = opt ? (opt.getAttribute('data-note') || '') : '';
-                holder.textContent = note ? `備註：${note}` : '';
+                holder.textContent = note ? `${note}` : '';
             };
             selectEl.addEventListener('change', update);
             update();
@@ -471,26 +471,24 @@
                         </div>
                         <div class="overflow-x-auto">
                             <div class="min-w-[1100px]">
-                            <table class="w-full text-lg bg-white text-center">
-                                <thead class="bg-blue-100 text-blue-800">
-                                <tr>
-                                    <th class="border px-2 py-1">場次</th>
-                                    <th class="border px-2 py-1">時間</th>
-                                    <th class="border px-2 py-1">先攻</th>
-                                    <th class="border px-2 py-1">VS</th>
-                                    <th class="border px-2 py-1">後攻</th>
-                                    <th class="border px-2 py-1">主審</th>
-                                    <th class="border px-2 py-1">一壘審</th>
-                                    <th class="border px-2 py-1">二壘審</th>
-                                    <th class="border px-2 py-1">三壘審</th>
-                                    <th class="border px-2 py-1">記錄</th>
-                                    <th class="border px-2 py-1">備註</th>
-                                </tr>
-                                </thead>
-                                <tbody data-date="${did}" data-loc="${lid}">
-                                ${body}
-                                </tbody>
-                            </table>
+                                <table class="w-full text-lg bg-white text-center">
+                                    <thead class="bg-blue-100 text-blue-800">
+                                        <tr>
+                                            <th class="border px-2 py-1">場次</th>
+                                            <th class="border px-2 py-1">時間</th>
+                                            <th class="border px-2 py-1">先攻</th>
+                                            <th class="border px-2 py-1">VS</th>
+                                            <th class="border px-2 py-1">後攻</th>
+                                            <th class="border px-2 py-1">主審</th>
+                                            <th class="border px-2 py-1">一壘審</th>
+                                            <th class="border px-2 py-1">二壘審</th>
+                                            <th class="border px-2 py-1">三壘審</th>
+                                            <th class="border px-2 py-1">記錄</th>
+                                            <th class="border px-2 py-1">備註</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody data-date="${did}" data-loc="${lid}">${body}</tbody>
+                                </table>
                             </div>
                         </div>
                         <div class="px-4 py-3 border-t bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
