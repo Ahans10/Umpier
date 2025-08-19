@@ -1171,482 +1171,543 @@
     }
 
     document.getElementById('btn-add-match-date').addEventListener('click', async () => {
-        contentArea.innerHTML = `
-            <h2 class="text-2xl font-bold mb-6 text-center">新增賽程</h2>
+            contentArea.innerHTML = `
+                <h2 class="text-2xl font-bold mb-6 text-center">新增賽程</h2>
 
-            <form id="match-form" class="space-y-6">
-            <!-- 賽事 -->
-            <div>
-                <label class="block font-semibold mb-2">賽事名稱</label>
-                <select id="games-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                <option value="">載入中...</option>
-                </select>
-            </div>
-
-            <!-- 日期、地點 -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <form id="match-form" class="space-y-6">
+                <!-- 賽事 -->
                 <div>
-                <label class="block font-semibold mb-2">日期</label>
-                <select id="date-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                    <label class="block font-semibold mb-2">賽事名稱</label>
+                    <select id="games-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
                     <option value="">載入中...</option>
-                </select>
+                    </select>
                 </div>
-                <div>
-                <label class="block font-semibold mb-2">地點</label>
-                <select id="loc-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                    <option value="">載入中...</option>
-                </select>
+
+                <!-- 日期、地點 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                    <label class="block font-semibold mb-2">日期</label>
+                    <select id="date-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                        <option value="">載入中...</option>
+                    </select>
+                    </div>
+                    <div>
+                    <label class="block font-semibold mb-2">地點</label>
+                    <select id="loc-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                        <option value="">載入中...</option>
+                    </select>
+                    </div>
                 </div>
-            </div>
 
-            <!-- 編號、時間 -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                <label class="block font-semibold mb-2">編號（場次）</label>
-                <input id="session-input" type="text" placeholder="例：A1 或 1"
-                        class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                <!-- 編號、時間 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                    <label class="block font-semibold mb-2">編號（場次）</label>
+                    <input id="session-input" type="text" placeholder="例：A1 或 1"
+                            class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                    </div>
+                    <div>
+                    <label class="block font-semibold mb-2">時間</label>
+                    <input id="time-input" type="time"
+                            class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                    </div>
                 </div>
-                <div>
-                <label class="block font-semibold mb-2">時間</label>
-                <input id="time-input" type="time"
-                        class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+
+                <!-- 先攻 / 後攻 -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                    <label class="block font-semibold mb-2">先攻隊伍</label>
+                    <select id="team1-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                        <option value="">請先選擇賽事</option>
+                    </select>
+                    </div>
+                    <div>
+                    <label class="block font-semibold mb-2">後攻隊伍</label>
+                    <select id="team2-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                        <option value="">請先選擇賽事</option>
+                    </select>
+                    </div>
                 </div>
-            </div>
 
-            <!-- 先攻 / 後攻 -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                <label class="block font-semibold mb-2">先攻隊伍</label>
-                <select id="team1-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                    <option value="">請先選擇賽事</option>
-                </select>
+                <div class="flex justify-end gap-3">
+                    <button type="submit"
+                            class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                    新增賽程
+                    </button>
                 </div>
-                <div>
-                <label class="block font-semibold mb-2">後攻隊伍</label>
-                <select id="team2-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                    <option value="">請先選擇賽事</option>
-                </select>
+                </form>
+
+                <!-- 搜尋區塊 -->
+                <div class="mt-10 pt-6 border-t border-blue-200">
+                <h3 class="text-xl font-bold mb-4">查詢賽程</h3>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                    <div>
+                    <label class="block font-semibold mb-2">賽事</label>
+                    <select id="q-game" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                        <option value="">載入中...</option>
+                    </select>
+                    </div>
+                    <div>
+                    <label class="block font-semibold mb-2">地點</label>
+                    <select id="q-loc" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                        <option value="">載入中...</option>
+                    </select>
+                    </div>
+                    <div class="flex sm:block">
+                    <button id="btn-query" class="w-full px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">查詢</button>
+                    </div>
                 </div>
-            </div>
-
-            <div class="flex justify-end gap-3">
-                <button type="submit"
-                        class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                新增賽程
-                </button>
-            </div>
-            </form>
-
-            <!-- 搜尋區塊 -->
-            <div class="mt-10 pt-6 border-t border-blue-200">
-            <h3 class="text-xl font-bold mb-4">查詢賽程</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                <div>
-                <label class="block font-semibold mb-2">賽事</label>
-                <select id="q-game" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                    <option value="">載入中...</option>
-                </select>
+                <div id="search-tip" class="text-sm text-blue-700 mt-2"></div>
+                <div id="search-result" class="mt-6 space-y-8"></div>
                 </div>
-                <div>
-                <label class="block font-semibold mb-2">地點</label>
-                <select id="q-loc" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                    <option value="">載入中...</option>
-                </select>
-                </div>
-                <div class="flex sm:block">
-                <button id="btn-query" class="w-full px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">查詢</button>
-                </div>
-            </div>
-            <div id="search-tip" class="text-sm text-blue-700 mt-2"></div>
-            <div id="search-result" class="mt-6 space-y-8"></div>
-            </div>
 
-            <div id="match-tip" class="text-sm text-blue-700 mt-2"></div>
-        `;
+                <div id="match-tip" class="text-sm text-blue-700 mt-2"></div>
+            `;
 
-        const el = {
-            form: document.getElementById('match-form'),
-            games: document.getElementById('games-select'),
-            date: document.getElementById('date-select'),
-            loc: document.getElementById('loc-select'),
-            session: document.getElementById('session-input'),
-            time: document.getElementById('time-input'),
-            team1: document.getElementById('team1-select'),
-            team2: document.getElementById('team2-select'),
-            tip: document.getElementById('match-tip'),
-            // 搜尋
-            qGame: document.getElementById('q-game'),
-            qLoc: document.getElementById('q-loc'),
-            btnQuery: document.getElementById('btn-query'),
-            searchTip: document.getElementById('search-tip'),
-            searchResult: document.getElementById('search-result'),
-        };
-
-        const maps = {
-            games: new Map(),
-            dates: new Map(),
-            datesLabel: new Map(),
-            locs: new Map(),
-            teams: new Map(),
-            profiles: new Map(),
-        };
-
-        let currentEditId = null;
-
-        function exitEditMode() {
-            currentEditId = null;
-            el.form.reset();
-            el.games.dispatchEvent(new Event('change'));
-            const submitBtn = el.form.querySelector('button[type="submit"]');
-            if (submitBtn) submitBtn.textContent = '新增賽程';
-            const cancelBtn = document.getElementById('btn-cancel-edit');
-            if (cancelBtn) cancelBtn.remove();
-        }
-
-        async function fillFormFromMatch(row) {
-            el.games.value = row.games_id || '';
-            await loadTeamsByGame(el.games.value);
-
-            el.date.value = row.match_dates_id || '';
-            el.loc.value = row.locations_id || '';
-            el.session.value = row.session || '';
-            el.time.value = (row.time || '').slice(0, 5);
-            el.team1.value = row.teams_id1 || '';
-            el.team2.value = row.teams_id2 || '';
-
-            const submitBtn = el.form.querySelector('button[type="submit"]');
-            if (submitBtn) submitBtn.textContent = '儲存修改';
-
-            if (!document.getElementById('btn-cancel-edit')) {
-                const cancelBtn = document.createElement('button');
-                cancelBtn.id = 'btn-cancel-edit';
-                cancelBtn.type = 'button';
-                cancelBtn.className = 'px-4 py-2 border rounded hover:bg-blue-50';
-                cancelBtn.textContent = '取消修改';
-                submitBtn.parentElement.prepend(cancelBtn);
-                cancelBtn.addEventListener('click', exitEditMode);
-            }
-        }
-
-        async function loadStaticOptions() {
-            el.tip.textContent = '載入選單中...';
-
-            const [gamesRes, datesRes, locsRes] = await Promise.all([
-                supabase.from('games').select('id, name').order('name', { ascending: true }),
-                supabase.from('match_dates').select('id, date').order('date', { ascending: true }),
-                supabase.from('locations').select('id, name').order('name', { ascending: true })
-            ]);
-
-            if (gamesRes.error) {
-                el.games.innerHTML = `<option value="">載入賽事失敗</option>`;
-                el.qGame.innerHTML = `<option value="">載入賽事失敗</option>`;
-                console.error(gamesRes.error);
-            } else {
-                const opts = (gamesRes.data || []);
-                el.games.innerHTML = `<option value="">請選擇賽事</option>` +
-                    opts.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-                el.qGame.innerHTML = `<option value="">請選擇賽事</option>` +
-                    opts.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-                maps.games.clear();
-                opts.forEach(g => maps.games.set(String(g.id), g.name));
-            }
-
-            if (datesRes.error) {
-                el.date.innerHTML = `<option value="">載入日期失敗</option>`;
-                console.error(datesRes.error);
-            } else {
-                const opts = (datesRes.data || []);
-                el.date.innerHTML = `<option value="">請選擇日期</option>` +
-                    opts.map(d => {
-                        const iso = String(d.date).slice(0, 10);
-                        const label = new Date(d.date).toLocaleDateString('zh-TW', {
-                            year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
-                        });
-                        maps.dates.set(String(d.id), iso);
-                        maps.datesLabel.set(String(d.id), label);
-                        return `<option value="${d.id}">${label}</option>`;
-                    }).join('');
-            }
-
-            if (locsRes.error) {
-                el.loc.innerHTML = `<option value="">載入地點失敗</option>`;
-                el.qLoc.innerHTML = `<option value="">載入地點失敗</option>`;
-                console.error(locsRes.error);
-            } else {
-                const opts = (locsRes.data || []);
-                el.loc.innerHTML = `<option value="">請選擇地點</option>` +
-                    opts.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-                el.qLoc.innerHTML = `<option value="">請選擇地點</option>` +
-                    opts.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-                maps.locs.clear();
-                opts.forEach(l => maps.locs.set(String(l.id), l.name));
-            }
-
-            el.tip.textContent = '';
-        }
-
-        async function loadTeamsByGame(gameId) {
-            if (!gameId) {
-                el.team1.innerHTML = `<option value="">請先選擇賽事</option>`;
-                el.team2.innerHTML = `<option value="">請先選擇賽事</option>`;
-                return;
-            }
-            const { data, error } = await supabase
-                .from('teams')
-                .select('id, name')
-                .eq('games_id', gameId)
-                .order('name', { ascending: true });
-
-            if (error) {
-                console.error(error);
-                el.team1.innerHTML = `<option value="">載入隊伍失敗</option>`;
-                el.team2.innerHTML = `<option value="">載入隊伍失敗</option>`;
-                return;
-            }
-
-            const options = `<option value="">請選擇隊伍</option>` +
-                (data || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
-            el.team1.innerHTML = options;
-            el.team2.innerHTML = options;
-
-            maps.teams.clear();
-            (data || []).forEach(t => maps.teams.set(String(t.id), t.name));
-        }
-
-        el.games.addEventListener('change', () => loadTeamsByGame(el.games.value));
-
-        el.form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const payload = {
-                games_id: el.games.value || null,
-                match_dates_id: el.date.value || null,
-                locations_id: el.loc.value || null,
-                session: (el.session.value || '').trim(),
-                time: el.time.value || null,
-                teams_id1: el.team1.value || null,
-                teams_id2: el.team2.value || null,
-                home_id: null, base1_id: null, base2_id: null, base3_id: null,
-                recorder_id: null, supervisor_id: null,
-                remark: null,
-                upload: false
+            const el = {
+                form: document.getElementById('match-form'),
+                games: document.getElementById('games-select'),
+                date: document.getElementById('date-select'),
+                loc: document.getElementById('loc-select'),
+                session: document.getElementById('session-input'),
+                time: document.getElementById('time-input'),
+                team1: document.getElementById('team1-select'),
+                team2: document.getElementById('team2-select'),
+                tip: document.getElementById('match-tip'),
+                // 搜尋
+                qGame: document.getElementById('q-game'),
+                qLoc: document.getElementById('q-loc'),
+                btnQuery: document.getElementById('btn-query'),
+                searchTip: document.getElementById('search-tip'),
+                searchResult: document.getElementById('search-result'),
             };
 
-            if (!payload.games_id) return alert('請選擇賽事');
-            if (!payload.match_dates_id) return alert('請選擇日期');
-            if (!payload.locations_id) return alert('請選擇地點');
-            if (!payload.session) return alert('請輸入場次編號');
-            if (!payload.time) return alert('請選擇時間');
-            if (!payload.teams_id1 || !payload.teams_id2) return alert('請選擇先攻與後攻隊伍');
-            if (payload.teams_id1 === payload.teams_id2) return alert('先攻與後攻隊伍不可相同');
+            const maps = {
+                games: new Map(),
+                dates: new Map(),
+                datesLabel: new Map(),
+                locs: new Map(),
+                teams: new Map(),
+                profiles: new Map(),
+            };
 
-            const { data: chkTeams, error: chkErr } = await supabase
-                .from('teams')
-                .select('id, games_id')
-                .in('id', [payload.teams_id1, payload.teams_id2]);
+            const LS_MATCH_DEFAULTS = 'match_new_defaults';
 
-            if (chkErr) { console.error(chkErr); return alert('驗證隊伍所屬賽事失敗，請稍後再試'); }
-            const ok = Array.isArray(chkTeams) && chkTeams.length === 2 &&
-                chkTeams.every(t => String(t.games_id) === String(payload.games_id));
-            if (!ok) return alert('所選隊伍不屬於同一賽事，請重新選擇');
+            function saveMatchDefaults({ games_id, match_dates_id, locations_id }) {
+                const payload = {
+                    games_id: String(games_id || ''),
+                    match_dates_id: String(match_dates_id || ''),
+                    locations_id: String(locations_id || ''),
+                };
+                localStorage.setItem(LS_MATCH_DEFAULTS, JSON.stringify(payload));
+            }
 
-            if (currentEditId) {
-                const { error: updErr } = await supabase
-                    .from('matches')
-                    .update(payload)
-                    .eq('id', currentEditId);
-
-                if (updErr) {
-                    console.error(updErr);
-                    alert('更新失敗，請稍後再試');
-                } else {
-                    alert('更新成功！');
-                    exitEditMode();
-                    if (el.qGame.value && el.qLoc.value) el.btnQuery.click();
-                }
-            } else {
-                const { error: insErr } = await supabase.from('matches').insert(payload);
-                if (insErr) {
-                    console.error(insErr);
-                    alert('新增賽程失敗，請稍後再試');
-                } else {
-                    alert('賽程新增成功！');
-                    el.date.value = ''; el.loc.value = ''; el.session.value = '';
-                    el.time.value = ''; el.team1.value = ''; el.team2.value = '';
+            function loadMatchDefaults() {
+                try {
+                    const raw = localStorage.getItem(LS_MATCH_DEFAULTS);
+                    return raw ? JSON.parse(raw) : null;
+                } catch {
+                    return null;
                 }
             }
-        });
 
-        el.btnQuery.addEventListener('click', async () => {
-            const gameId = el.qGame.value;
-            const locId = el.qLoc.value;
+            let currentEditId = null;
 
-            if (!gameId) return alert('請選擇要查詢的賽事');
-            if (!locId) return alert('請選擇要查詢的地點');
-
-            el.searchTip.textContent = '查詢中...';
-            el.searchResult.innerHTML = '';
-
-            const { data: rows, error } = await supabase
-                .from('matches')
-                .select('id, games_id, match_dates_id, locations_id, session, time, teams_id1, teams_id2')
-                .eq('games_id', gameId)
-                .eq('locations_id', locId);
-
-            if (error) {
-                console.error(error);
-                el.searchTip.textContent = '查詢失敗，請稍後再試';
-                return;
+            function exitEditMode() {
+                currentEditId = null;
+                el.form.reset();
+                el.games.dispatchEvent(new Event('change'));
+                const submitBtn = el.form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.textContent = '新增賽程';
+                const cancelBtn = document.getElementById('btn-cancel-edit');
+                if (cancelBtn) cancelBtn.remove();
             }
 
-            if (!rows || rows.length === 0) {
-                el.searchTip.textContent = '沒有資料。';
-                return;
+            async function fillFormFromMatch(row) {
+                el.games.value = row.games_id || '';
+                await loadTeamsByGame(el.games.value);
+
+                el.date.value = row.match_dates_id || '';
+                el.loc.value = row.locations_id || '';
+                el.session.value = row.session || '';
+                el.time.value = (row.time || '').slice(0, 5);
+                el.team1.value = row.teams_id1 || '';
+                el.team2.value = row.teams_id2 || '';
+
+                const submitBtn = el.form.querySelector('button[type="submit"]');
+                if (submitBtn) submitBtn.textContent = '儲存修改';
+
+                if (!document.getElementById('btn-cancel-edit')) {
+                    const cancelBtn = document.createElement('button');
+                    cancelBtn.id = 'btn-cancel-edit';
+                    cancelBtn.type = 'button';
+                    cancelBtn.className = 'px-4 py-2 border rounded hover:bg-blue-50';
+                    cancelBtn.textContent = '取消修改';
+                    submitBtn.parentElement.prepend(cancelBtn);
+                    cancelBtn.addEventListener('click', exitEditMode);
+                }
             }
 
-            const teamIds = new Set();
-            rows.forEach(r => {
-                if (r.teams_id1) teamIds.add(r.teams_id1);
-                if (r.teams_id2) teamIds.add(r.teams_id2);
-            });
-            if (teamIds.size > 0) {
-                const { data: teamList, error: teamErr } = await supabase
+            async function loadStaticOptions() {
+                el.tip.textContent = '載入選單中...';
+
+                const [gamesRes, datesRes, locsRes] = await Promise.all([
+                    supabase.from('games').select('id, name').order('name', { ascending: true }),
+                    supabase.from('match_dates').select('id, date').order('date', { ascending: true }),
+                    supabase.from('locations').select('id, name').order('name', { ascending: true })
+                ]);
+
+                if (gamesRes.error) {
+                    el.games.innerHTML = `<option value="">載入賽事失敗</option>`;
+                    el.qGame.innerHTML = `<option value="">載入賽事失敗</option>`;
+                    console.error(gamesRes.error);
+                } else {
+                    const opts = (gamesRes.data || []);
+                    el.games.innerHTML = `<option value="">請選擇賽事</option>` +
+                        opts.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                    el.qGame.innerHTML = `<option value="">請選擇賽事</option>` +
+                        opts.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                    maps.games.clear();
+                    opts.forEach(g => maps.games.set(String(g.id), g.name));
+                }
+
+                if (datesRes.error) {
+                    el.date.innerHTML = `<option value="">載入日期失敗</option>`;
+                    console.error(datesRes.error);
+                } else {
+                    const opts = (datesRes.data || []);
+                    el.date.innerHTML = `<option value="">請選擇日期</option>` +
+                        opts.map(d => {
+                            const iso = String(d.date).slice(0, 10);
+                            const label = new Date(d.date).toLocaleDateString('zh-TW', {
+                                year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
+                            });
+                            maps.dates.set(String(d.id), iso);
+                            maps.datesLabel.set(String(d.id), label);
+                            return `<option value="${d.id}">${label}</option>`;
+                        }).join('');
+                }
+
+                if (locsRes.error) {
+                    el.loc.innerHTML = `<option value="">載入地點失敗</option>`;
+                    el.qLoc.innerHTML = `<option value="">載入地點失敗</option>`;
+                    console.error(locsRes.error);
+                } else {
+                    const opts = (locsRes.data || []);
+                    el.loc.innerHTML = `<option value="">請選擇地點</option>` +
+                        opts.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+                    el.qLoc.innerHTML = `<option value="">請選擇地點</option>` +
+                        opts.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+                    maps.locs.clear();
+                    opts.forEach(l => maps.locs.set(String(l.id), l.name));
+                }
+
+                await applySavedDefaults();
+                applySavedDefaultsToQuery();
+                el.tip.textContent = '';
+            }
+
+            async function loadTeamsByGame(gameId) {
+                if (!gameId) {
+                    el.team1.innerHTML = `<option value="">請先選擇賽事</option>`;
+                    el.team2.innerHTML = `<option value="">請先選擇賽事</option>`;
+                    return;
+                }
+                const { data, error } = await supabase
                     .from('teams')
                     .select('id, name')
-                    .in('id', Array.from(teamIds));
-                if (!teamErr && teamList) {
-                    teamList.forEach(t => maps.teams.set(String(t.id), t.name));
+                    .eq('games_id', gameId)
+                    .order('name', { ascending: true });
+
+                if (error) {
+                    console.error(error);
+                    el.team1.innerHTML = `<option value="">載入隊伍失敗</option>`;
+                    el.team2.innerHTML = `<option value="">載入隊伍失敗</option>`;
+                    return;
+                }
+
+                const options = `<option value="">請選擇隊伍</option>` +
+                    (data || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
+                el.team1.innerHTML = options;
+                el.team2.innerHTML = options;
+
+                maps.teams.clear();
+                (data || []).forEach(t => maps.teams.set(String(t.id), t.name));
+            }
+
+            async function applySavedDefaults() {
+                const d = loadMatchDefaults();
+                if (!d) return;
+
+                if (d.games_id && el.games.querySelector(`option[value="${d.games_id}"]`)) {
+                    el.games.value = d.games_id;
+                    await loadTeamsByGame(d.games_id);
+                } else {
+                    return;
+                }
+
+                if (d.match_dates_id && el.date.querySelector(`option[value="${d.match_dates_id}"]`)) {
+                    el.date.value = d.match_dates_id;
+                }
+                if (d.locations_id && el.loc.querySelector(`option[value="${d.locations_id}"]`)) {
+                    el.loc.value = d.locations_id;
                 }
             }
 
-            const byDate = {};
-            rows.forEach(r => {
-                const iso = maps.dates.get(String(r.match_dates_id)) || '未知日期';
-                if (!byDate[iso]) byDate[iso] = [];
-                byDate[iso].push(r);
+            function applySavedDefaultsToQuery() {
+                const d = loadMatchDefaults();
+                if (!d) return;
+                if (d.games_id && el.qGame.querySelector(`option[value="${d.games_id}"]`)) {
+                    el.qGame.value = d.games_id;
+                }
+                if (d.locations_id && el.qLoc.querySelector(`option[value="${d.locations_id}"]`)) {
+                    el.qLoc.value = d.locations_id;
+                }
+            }
+
+            el.games.addEventListener('change', () => loadTeamsByGame(el.games.value));
+
+            el.form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+
+                const payload = {
+                    games_id: el.games.value || null,
+                    match_dates_id: el.date.value || null,
+                    locations_id: el.loc.value || null,
+                    session: (el.session.value || '').trim(),
+                    time: el.time.value || null,
+                    teams_id1: el.team1.value || null,
+                    teams_id2: el.team2.value || null,
+                    home_id: null, base1_id: null, base2_id: null, base3_id: null,
+                    recorder_id: null, supervisor_id: null,
+                    remark: null,
+                    upload: false
+                };
+
+                if (!payload.games_id) return alert('請選擇賽事');
+                if (!payload.match_dates_id) return alert('請選擇日期');
+                if (!payload.locations_id) return alert('請選擇地點');
+                if (!payload.session) return alert('請輸入場次編號');
+                if (!payload.time) return alert('請選擇時間');
+                if (!payload.teams_id1 || !payload.teams_id2) return alert('請選擇先攻與後攻隊伍');
+                if (payload.teams_id1 === payload.teams_id2) return alert('先攻與後攻隊伍不可相同');
+
+                const { data: chkTeams, error: chkErr } = await supabase
+                    .from('teams')
+                    .select('id, games_id')
+                    .in('id', [payload.teams_id1, payload.teams_id2]);
+
+                if (chkErr) { console.error(chkErr); return alert('驗證隊伍所屬賽事失敗，請稍後再試'); }
+                const ok = Array.isArray(chkTeams) && chkTeams.length === 2 &&
+                    chkTeams.every(t => String(t.games_id) === String(payload.games_id));
+                if (!ok) return alert('所選隊伍不屬於同一賽事，請重新選擇');
+
+                if (currentEditId) {
+                    const { error: updErr } = await supabase
+                        .from('matches')
+                        .update(payload)
+                        .eq('id', currentEditId);
+
+                    if (updErr) {
+                        console.error(updErr);
+                        alert('更新失敗，請稍後再試');
+                    } else {
+                        alert('更新成功！');
+                        exitEditMode();
+                        if (el.qGame.value && el.qLoc.value) el.btnQuery.click();
+                    }
+                } else {
+                    const { error: insErr } = await supabase.from('matches').insert(payload);
+                    if (insErr) {
+                        console.error(insErr);
+                        alert('新增賽程失敗，請稍後再試');
+                    } else {
+                        alert('賽程新增成功！');
+
+                        saveMatchDefaults({
+                            games_id: el.games.value,
+                            match_dates_id: el.date.value,
+                            locations_id: el.loc.value,
+                        });
+
+                        el.session.value = '';
+                        el.time.value = '';
+                        el.team1.value = '';
+                        el.team2.value = '';
+                        el.session.focus();
+                    }
+                }
             });
 
-            const dateKeys = Object.keys(byDate).sort();
+            el.btnQuery.addEventListener('click', async () => {
+                const gameId = el.qGame.value;
+                const locId = el.qLoc.value;
 
-            dateKeys.forEach(d => {
-                byDate[d].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
-            });
+                if (!gameId) return alert('請選擇要查詢的賽事');
+                if (!locId) return alert('請選擇要查詢的地點');
 
-            const gameName = maps.games.get(String(gameId)) || '';
-            const locName = maps.locs.get(String(locId)) || '';
+                el.searchTip.textContent = '查詢中...';
+                el.searchResult.innerHTML = '';
 
-            el.searchResult.innerHTML = dateKeys.map(d => {
-                const dLabel = [...maps.datesLabel.entries()]
-                    .find(([id, lbl]) => maps.dates.get(id) === d)?.[1] || d;
+                const { data: rows, error } = await supabase
+                    .from('matches')
+                    .select('id, games_id, match_dates_id, locations_id, session, time, teams_id1, teams_id2')
+                    .eq('games_id', gameId)
+                    .eq('locations_id', locId);
 
-                const rowsHtml = byDate[d].map(r => {
-                    const t1 = maps.teams.get(String(r.teams_id1)) || r.teams_id1 || '-';
-                    const t2 = maps.teams.get(String(r.teams_id2)) || r.teams_id2 || '-';
-                    const time = r.time || '-';
-                    const session = r.session || '-';
-                    const confirmText = `確定刪除：
-                        日期：${dLabel}
-                        賽事：${gameName}
-                        地點：${locName}
-                        時間：${time}
-                        場次：${session}
-                        對戰：${t1} vs ${t2}
-                        此操作無法復原。`;
+                if (error) {
+                    console.error(error);
+                    el.searchTip.textContent = '查詢失敗，請稍後再試';
+                    return;
+                }
+
+                if (!rows || rows.length === 0) {
+                    el.searchTip.textContent = '沒有資料。';
+                    return;
+                }
+
+                const teamIds = new Set();
+                rows.forEach(r => {
+                    if (r.teams_id1) teamIds.add(r.teams_id1);
+                    if (r.teams_id2) teamIds.add(r.teams_id2);
+                });
+                if (teamIds.size > 0) {
+                    const { data: teamList, error: teamErr } = await supabase
+                        .from('teams')
+                        .select('id, name')
+                        .in('id', Array.from(teamIds));
+                    if (!teamErr && teamList) {
+                        teamList.forEach(t => maps.teams.set(String(t.id), t.name));
+                    }
+                }
+
+                const byDate = {};
+                rows.forEach(r => {
+                    const iso = maps.dates.get(String(r.match_dates_id)) || '未知日期';
+                    if (!byDate[iso]) byDate[iso] = [];
+                    byDate[iso].push(r);
+                });
+
+                const dateKeys = Object.keys(byDate).sort();
+                dateKeys.forEach(d => {
+                    byDate[d].sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+                });
+
+                const gameName = maps.games.get(String(gameId)) || '';
+                const locName = maps.locs.get(String(locId)) || '';
+
+                el.searchResult.innerHTML = dateKeys.map(d => {
+                    const dLabel = [...maps.datesLabel.entries()]
+                        .find(([id, lbl]) => maps.dates.get(id) === d)?.[1] || d;
+
+                    const rowsHtml = byDate[d].map(r => {
+                        const t1 = maps.teams.get(String(r.teams_id1)) || r.teams_id1 || '-';
+                        const t2 = maps.teams.get(String(r.teams_id2)) || r.teams_id2 || '-';
+                        const time = r.time || '-';
+                        const session = r.session || '-';
+                        const confirmText = `確定刪除：
+                                            日期：${dLabel}
+                                            賽事：${gameName}
+                                            地點：${locName}
+                                            時間：${time}
+                                            場次：${session}
+                                            對戰：${t1} vs ${t2}
+                                            此操作無法復原。`;
+                        return `
+                            <tr data-id="${r.id}">
+                                <td class="border px-3 py-2 text-center">${session}</td>
+                                <td class="border px-3 py-2 text-center whitespace-nowrap">${time}</td>
+                                <td class="border px-3 py-2 text-center">${t1}</td>
+                                <td class="border px-3 py-2 text-center">vs</td>
+                                <td class="border px-3 py-2 text-center">${t2}</td>
+                                <td class="border px-3 py-2 text-center">
+                                <button
+                                    class="btn-edit-match inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                    title="修改"
+                                    data-id="${r.id}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button
+                                    class="btn-del-match inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
+                                    title="刪除"
+                                    data-id="${r.id}"
+                                    data-confirm="${confirmText.replace(/"/g, '&quot;')}"
+                                >
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                                </td>
+                            </tr>
+                            `;
+                    }).join('');
 
                     return `
-                        <tr data-id="${r.id}">
-                            <td class="border px-3 py-2 text-center">${session}</td>
-                            <td class="border px-3 py-2 text-center whitespace-nowrap">${time}</td>
-                            <td class="border px-3 py-2 text-center">${t1}</td>
-                            <td class="border px-3 py-2 text-center">vs</td>
-                            <td class="border px-3 py-2 text-center">${t2}</td>
-                            <td class="border px-3 py-2 text-center">
-                                <button
-                                class="btn-edit-match inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                title="修改"
-                                data-id="${r.id}">
-                                <i class="fas fa-edit"></i>
-                            </button>
-                            <button
-                                class="btn-del-match inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
-                                title="刪除"
-                                data-id="${r.id}"
-                                data-confirm="${confirmText.replace(/"/g, '&quot;')}"
-                            >
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                            </td>
-                        </tr>
-                        `;
+                        <div class="rounded-xl border border-blue-300 overflow-hidden">
+                        <div class="bg-blue-50 px-4 py-3 font-semibold text-center">
+                            ${dLabel} ｜ ${gameName} ｜ 地點：${locName}
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm bg-white text-center">
+                            <thead class="bg-blue-100 text-blue-800">
+                                <tr>
+                                <th class="border px-3 py-2 text-center">場次</th>
+                                <th class="border px-3 py-2 text-center">時間</th>
+                                <th class="border px-3 py-2 text-center">先攻</th>
+                                <th class="border px-3 py-2 text-center">VS</th>
+                                <th class="border px-3 py-2 text-center">後攻</th>
+                                <th class="border px-3 py-2 text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rowsHtml}
+                            </tbody>
+                            </table>
+                        </div>
+                        </div>
+                    `;
                 }).join('');
 
-                return `
-                    <div class="rounded-xl border border-blue-300 overflow-hidden">
-                    <div class="bg-blue-50 px-4 py-3 font-semibold text-center">
-                        ${dLabel} ｜ ${gameName} ｜ 地點：${locName}
-                    </div>
-                    <div class="overflow-x-auto">
-                        <table class="w-full text-sm bg-white text-center"> <!-- 整張表置中 -->
-                        <thead class="bg-blue-100 text-blue-800">
-                            <tr>
-                            <th class="border px-3 py-2 text-center">場次</th>
-                            <th class="border px-3 py-2 text-center">時間</th>
-                            <th class="border px-3 py-2 text-center">先攻</th>
-                            <th class="border px-3 py-2 text-center">VS</th>
-                            <th class="border px-3 py-2 text-center">後攻</th>
-                            <th class="border px-3 py-2 text-center">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rowsHtml}
-                        </tbody>
-                        </table>
-                    </div>
-                    </div>
-                `;
-            }).join('');
+                el.searchResult.querySelectorAll('.btn-del-match').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        const msg = btn.getAttribute('data-confirm') || '確定刪除？此操作無法復原。';
+                        if (!confirm(msg)) return;
 
-            el.searchResult.querySelectorAll('.btn-del-match').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const id = btn.getAttribute('data-id');
-                    const msg = btn.getAttribute('data-confirm') || '確定刪除？此操作無法復原。';
-                    if (!confirm(msg)) return;
-
-                    const { error: delErr } = await supabase.from('matches').delete().eq('id', id);
-                    if (delErr) {
-                        console.error(delErr);
-                        alert('刪除失敗，請稍後再試');
-                    } else {
-                        el.btnQuery.click();
-                    }
+                        const { error: delErr } = await supabase.from('matches').delete().eq('id', id);
+                        if (delErr) {
+                            console.error(delErr);
+                            alert('刪除失敗，請稍後再試');
+                        } else {
+                            el.btnQuery.click();
+                        }
+                    });
                 });
+
+                el.searchResult.querySelectorAll('.btn-edit-match').forEach(btn => {
+                    btn.addEventListener('click', async () => {
+                        const id = btn.getAttribute('data-id');
+                        const { data, error } = await supabase
+                            .from('matches')
+                            .select('id, games_id, match_dates_id, locations_id, session, time, teams_id1, teams_id2')
+                            .eq('id', id)
+                            .single();
+
+                        if (error || !data) {
+                            console.error(error);
+                            alert('讀取資料失敗，請稍後再試');
+                            return;
+                        }
+
+                        currentEditId = id;
+                        await fillFormFromMatch(data);
+                        el.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    });
+                });
+
+                el.searchTip.textContent = `共 ${rows.length} 場比賽。`;
             });
 
-            el.searchResult.querySelectorAll('.btn-edit-match').forEach(btn => {
-                btn.addEventListener('click', async () => {
-                    const id = btn.getAttribute('data-id');
-                    const { data, error } = await supabase
-                        .from('matches')
-                        .select('id, games_id, match_dates_id, locations_id, session, time, teams_id1, teams_id2')
-                        .eq('id', id)
-                        .single();
-
-                    if (error || !data) {
-                        console.error(error);
-                        alert('讀取資料失敗，請稍後再試');
-                        return;
-                    }
-
-                    currentEditId = id;
-                    await fillFormFromMatch(data);
-                    el.form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
-            });
-            el.searchTip.textContent = `共 ${rows.length} 場比賽。`;
+            await loadStaticOptions();
         });
-
-        await loadStaticOptions();
-    });
 
     document.getElementById('logout-btn').addEventListener('click', function () {
         localStorage.removeItem('profile');
