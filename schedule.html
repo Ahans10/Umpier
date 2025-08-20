@@ -127,7 +127,7 @@
     const contentArea = document.getElementById('content-area');
 
     document.getElementById('btn-schedule').addEventListener('click', async () => {
-        contentArea.innerHTML = `
+            contentArea.innerHTML = `
                 <h2 class="text-2xl font-bold mb-6 text-center">排班</h2>
 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end mb-6">
@@ -154,296 +154,289 @@
                 <div id="sch-result" class="space-y-10"></div>
             `;
 
-        const el = {
-            date: document.getElementById('sch-date'),
-            loc: document.getElementById('sch-loc'),
-            btn: document.getElementById('btn-sch-query'),
-            tip: document.getElementById('sch-tip'),
-            result: document.getElementById('sch-result'),
-        };
+            if (!window.html2canvas) {
+                const s = document.createElement('script');
+                s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+                document.head.appendChild(s);
+                await new Promise(res => s.onload = res);
+            }
 
-        const GUEST_PREFIX = 'guest:';
-        const GUEST_ADD_VALUE = `${GUEST_PREFIX}add`;
-        const guestPickMap = new Map();
-        const uuid4 = () => URL.createObjectURL(new Blob()).slice(-36);
-        const maps = {
-            games: new Map(),
-            locs: new Map(),
-            dates: new Map(),
-            datesLabel: new Map(),
-            teams: new Map(),
-        };
-        const getNote = (p) => (p?.note ?? p?.remark ?? '');
-
-        function attachNotePreview(selectEl) {
-            const holder = document.createElement('div');
-            holder.className = 'text-xs text-slate-600 mt-1 h-4';
-            const update = () => {
-                const opt = selectEl.options[selectEl.selectedIndex];
-                const note = opt ? (opt.getAttribute('data-note') || '') : '';
-                holder.textContent = note ? `${note}` : '';
+            const el = {
+                date: document.getElementById('sch-date'),
+                loc: document.getElementById('sch-loc'),
+                btn: document.getElementById('btn-sch-query'),
+                tip: document.getElementById('sch-tip'),
+                result: document.getElementById('sch-result'),
             };
-            selectEl.addEventListener('change', update);
-            update();
-            selectEl.parentElement.appendChild(holder);
-        }
 
-        function makePersonOptions(people, selectedId, withGuestAdd = true) {
-            const opts = ['<option value=""></option>'];
-            people.forEach(p => {
-                const sel = String(p.id) === String(selectedId) ? 'selected' : '';
-                const safeNote = (getNote(p) || '').replace(/"/g, '&quot;');
-                opts.push(
-                    `<option value="${p.id}" ${sel} title="${p.name}${safeNote ? '：' + safeNote : ''}" data-note="${safeNote}">${p.name}</option>`
-                );
-            });
-            if (withGuestAdd) {
-                opts.push(`<option value="${GUEST_ADD_VALUE}" data-note="">＋加入臨時人員…</option>`);
-            }
-            return opts.join('');
-        }
+            const GUEST_PREFIX = 'guest:';
+            const GUEST_ADD_VALUE = `${GUEST_PREFIX}add`;
+            const guestPickMap = new Map();
+            const uuid4 = () => URL.createObjectURL(new Blob()).slice(-36);
+            const maps = {
+                games: new Map(),
+                locs: new Map(),
+                dates: new Map(),
+                datesLabel: new Map(),
+                teams: new Map(),
+            };
+            const getNote = (p) => (p?.note ?? p?.remark ?? '');
 
-        async function loadStaticOptions() {
-            el.tip.textContent = '載入選項中...';
-
-            const [locsRes, datesRes, gamesRes] = await Promise.all([
-                supabase.from('locations').select('id, name').order('name'),
-                supabase.from('match_dates').select('id, date').order('date'),
-                supabase.from('games').select('id, name').order('name'),
-            ]);
-
-            if (!locsRes.error) {
-                const ls = locsRes.data || [];
-                el.loc.innerHTML = `<option value="">請選擇地點</option>` +
-                    ls.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-                maps.locs.clear(); ls.forEach(l => maps.locs.set(String(l.id), l.name));
-            } else {
-                el.loc.innerHTML = `<option value="">載入地點失敗</option>`;
+            function attachNotePreview(selectEl) {
+                const holder = document.createElement('div');
+                holder.className = 'text-xs text-slate-600 mt-1 h-4';
+                const update = () => {
+                    const opt = selectEl.options[selectEl.selectedIndex];
+                    const note = opt ? (opt.getAttribute('data-note') || '') : '';
+                    holder.textContent = note ? `${note}` : '';
+                };
+                selectEl.addEventListener('change', update);
+                update();
+                selectEl.parentElement.appendChild(holder);
             }
 
-            if (!datesRes.error) {
-                const ds = datesRes.data || [];
-                el.date.innerHTML = `<option value="">請選擇日期</option>` +
-                    ds.map(d => {
-                        const iso = String(d.date).slice(0, 10);
-                        const id = String(d.id);
-                        maps.dates.set(id, iso);
-                        const label = new Date(d.date).toLocaleDateString('zh-TW', {
-                            year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
-                        });
-                        maps.datesLabel.set(id, label);
-                        return `<option value="${id}">${label}</option>`;
-                    }).join('');
-            } else {
-                el.date.innerHTML = `<option value="">載入日期失敗</option>`;
-            }
-
-            if (!gamesRes.error) { (gamesRes.data || []).forEach(g => maps.games.set(String(g.id), g.name)); }
-            el.tip.textContent = '';
-        }
-        await loadStaticOptions();
-
-        el.date.addEventListener('change', () => {
-            const did = el.date.value;
-            const lid = el.loc.value;
-            if (did && !lid) {
-                runQuery({ dateId: did, locId: null });
-            } else {
-                el.result.innerHTML = '';
-                el.tip.textContent = did || lid ? '可按查詢顯示結果' : '';
-            }
-        });
-        el.btn.addEventListener('click', () => {
-            const did = el.date.value || null;
-            const lid = el.loc.value || null;
-            if (!did && !lid) return alert('請先選擇「日期」或「地點」（或兩者）');
-            runQuery({ dateId: did, locId: lid });
-        });
-
-        async function runQuery({ dateId, locId }) {
-            el.result.innerHTML = '';
-            el.tip.textContent = '查詢中...';
-
-            let q = supabase
-                .from('matches')
-                .select('id, games_id, match_dates_id, locations_id, session, time, teams_id1, teams_id2, home_id, base1_id, base2_id, base3_id, recorder_id, supervisor_id, remark, upload');
-
-            if (dateId) q = q.eq('match_dates_id', dateId);
-            if (locId) q = q.eq('locations_id', locId);
-
-            const { data: rows, error } = await q;
-            if (error) { console.error(error); el.tip.textContent = '查詢失敗，請稍後再試'; return; }
-            if (!rows || rows.length === 0) { el.tip.textContent = '沒有資料。'; return; }
-
-            const teamIds = new Set(), dateIds = new Set(), locIds = new Set();
-            rows.forEach(r => {
-                if (r.teams_id1) teamIds.add(r.teams_id1);
-                if (r.teams_id2) teamIds.add(r.teams_id2);
-                if (r.match_dates_id) dateIds.add(r.match_dates_id);
-                if (r.locations_id) locIds.add(r.locations_id);
-            });
-
-            if (teamIds.size) {
-                const { data: tlist } = await supabase.from('teams').select('id,name').in('id', Array.from(teamIds));
-                (tlist || []).forEach(t => maps.teams.set(String(t.id), t.name));
-            }
-
-            const { data: regs } = await supabase
-                .from('registrations')
-                .select('user_id, match_date_id, description')
-                .in('match_date_id', Array.from(dateIds));
-
-            const peopleByDate = {};
-            const regUserIds = Array.from(new Set((regs || []).map(r => r.user_id)));
-            if (regUserIds.length) {
-                const { data: profs } = await supabase.from('profiles').select('id, name').in('id', regUserIds);
-                (profs || []).forEach(p => {
-                    const uid = String(p.id);
-                    (regs || []).forEach(r => {
-                        if (String(r.user_id) !== uid) return;
-                        const did = String(r.match_date_id);
-                        if (!peopleByDate[did]) peopleByDate[did] = [];
-                        const exist = peopleByDate[did].find(x => x.id === uid);
-                        const regNote = (r.description || '').trim();
-                        if (!exist) peopleByDate[did].push({ id: uid, name: p.name, note: regNote });
-                        else {
-                            const setNotes = new Set([exist.note, regNote].filter(Boolean));
-                            exist.note = Array.from(setNotes).join(' / ');
-                        }
-                    });
+            function makePersonOptions(people, selectedId, withGuestAdd = true) {
+                const opts = ['<option value=""></option>'];
+                people.forEach(p => {
+                    const sel = String(p.id) === String(selectedId) ? 'selected' : '';
+                    const safeNote = (getNote(p) || '').replace(/"/g, '&quot;');
+                    opts.push(
+                        `<option value="${p.id}" ${sel} title="${p.name}${safeNote ? '：' + safeNote : ''}" data-note="${safeNote}">${p.name}</option>`
+                    );
                 });
+                if (withGuestAdd) {
+                    opts.push(`<option value="${GUEST_ADD_VALUE}" data-note="">＋加入臨時人員…</option>`);
+                }
+                return opts.join('');
             }
 
-            async function upsertGuestAssignment({ matchId, role, guestName, guestNote }) {
-                matchId = String(matchId || '').trim();
-                role = String(role || '').trim();
+            async function loadStaticOptions() {
+                el.tip.textContent = '載入選項中...';
 
-                if (!matchId || !role) throw new Error('missing matchId or role');
+                const [locsRes, datesRes, gamesRes] = await Promise.all([
+                    supabase.from('locations').select('id, name').order('name'),
+                    supabase.from('match_dates').select('id, date').order('date'),
+                    supabase.from('games').select('id, name').order('name'),
+                ]);
 
-                if (!guestName || !guestName.trim()) {
-                    await supabase
-                        .from('match_guest_assignments')
-                        .delete()
-                        .eq('match_id', matchId)
-                        .eq('role', role);
-                    return { deleted: true };
+                if (!locsRes.error) {
+                    const ls = locsRes.data || [];
+                    el.loc.innerHTML = `<option value="">請選擇地點</option>` +
+                        ls.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+                    maps.locs.clear(); ls.forEach(l => maps.locs.set(String(l.id), l.name));
+                } else {
+                    el.loc.innerHTML = `<option value="">載入地點失敗</option>`;
                 }
 
-                await supabase
-                    .from('match_guest_assignments')
-                    .delete()
-                    .eq('match_id', matchId)
-                    .eq('role', role);
+                if (!datesRes.error) {
+                    const ds = datesRes.data || [];
+                    el.date.innerHTML = `<option value="">請選擇日期</option>` +
+                        ds.map(d => {
+                            const iso = String(d.date).slice(0, 10);
+                            const id = String(d.id);
+                            maps.dates.set(id, iso);
+                            const label = new Date(d.date).toLocaleDateString('zh-TW', {
+                                year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
+                            });
+                            maps.datesLabel.set(id, label);
+                            return `<option value="${id}">${label}</option>`;
+                        }).join('');
+                } else {
+                    el.date.innerHTML = `<option value="">載入日期失敗</option>`;
+                }
 
-                const { error } = await supabase
-                    .from('match_guest_assignments')
-                    .insert([{
+                if (!gamesRes.error) { (gamesRes.data || []).forEach(g => maps.games.set(String(g.id), g.name)); }
+                el.tip.textContent = '';
+            }
+            await loadStaticOptions();
+
+            el.date.addEventListener('change', () => {
+                const did = el.date.value;
+                const lid = el.loc.value;
+                if (did && !lid) {
+                    runQuery({ dateId: did, locId: null });
+                } else {
+                    el.result.innerHTML = '';
+                    el.tip.textContent = did || lid ? '可按查詢顯示結果' : '';
+                }
+            });
+            el.btn.addEventListener('click', () => {
+                const did = el.date.value || null;
+                const lid = el.loc.value || null;
+                if (!did && !lid) return alert('請先選擇「日期」或「地點」（或兩者）');
+                runQuery({ dateId: did, locId: lid });
+            });
+
+            async function runQuery({ dateId, locId }) {
+                el.result.innerHTML = '';
+                el.tip.textContent = '查詢中...';
+
+                let q = supabase
+                    .from('matches')
+                    .select('id, games_id, match_dates_id, locations_id, session, time, teams_id1, teams_id2, home_id, base1_id, base2_id, base3_id, recorder_id, supervisor_id, remark, upload');
+
+                if (dateId) q = q.eq('match_dates_id', dateId);
+                if (locId) q = q.eq('locations_id', locId);
+
+                const { data: rows, error } = await q;
+                if (error) { console.error(error); el.tip.textContent = '查詢失敗，請稍後再試'; return; }
+                if (!rows || rows.length === 0) { el.tip.textContent = '沒有資料。'; return; }
+
+                const teamIds = new Set(), dateIds = new Set(), locIds = new Set();
+                rows.forEach(r => {
+                    if (r.teams_id1) teamIds.add(r.teams_id1);
+                    if (r.teams_id2) teamIds.add(r.teams_id2);
+                    if (r.match_dates_id) dateIds.add(r.match_dates_id);
+                    if (r.locations_id) locIds.add(r.locations_id);
+                });
+
+                if (teamIds.size) {
+                    const { data: tlist } = await supabase.from('teams').select('id,name').in('id', Array.from(teamIds));
+                    (tlist || []).forEach(t => maps.teams.set(String(t.id), t.name));
+                }
+
+                const { data: regs } = await supabase
+                    .from('registrations')
+                    .select('user_id, match_date_id, description')
+                    .in('match_date_id', Array.from(dateIds));
+
+                const peopleByDate = {};
+                const regUserIds = Array.from(new Set((regs || []).map(r => r.user_id)));
+                if (regUserIds.length) {
+                    const { data: profs } = await supabase.from('profiles').select('id, name').in('id', regUserIds);
+                    (profs || []).forEach(p => {
+                        const uid = String(p.id);
+                        (regs || []).forEach(r => {
+                            if (String(r.user_id) !== uid) return;
+                            const did = String(r.match_date_id);
+                            if (!peopleByDate[did]) peopleByDate[did] = [];
+                            const exist = peopleByDate[did].find(x => x.id === uid);
+                            const regNote = (r.description || '').trim();
+                            if (!exist) peopleByDate[did].push({ id: uid, name: p.name, note: regNote });
+                            else {
+                                const setNotes = new Set([exist.note, regNote].filter(Boolean));
+                                exist.note = Array.from(setNotes).join(' / ');
+                            }
+                        });
+                    });
+                }
+
+                async function upsertGuestAssignment({ matchId, role, guestName, guestNote }) {
+                    matchId = String(matchId || '').trim();
+                    role = String(role || '').trim();
+                    if (!matchId || !role) throw new Error('missing matchId or role');
+                    if (!guestName || !guestName.trim()) {
+                        await supabase.from('match_guest_assignments').delete().eq('match_id', matchId).eq('role', role);
+                        return { deleted: true };
+                    }
+                    await supabase.from('match_guest_assignments').delete().eq('match_id', matchId).eq('role', role);
+                    const { error } = await supabase.from('match_guest_assignments').insert([{
                         match_id: matchId,
                         role,
                         guest_name: guestName.trim(),
                         guest_note: guestNote ? String(guestNote).trim() : null,
                     }]);
-
-                if (error) throw error;
-                return { inserted: true };
-            }
-
-            const { data: supervisors } = await supabase.from('supervisor').select('id, name').order('name', { ascending: true });
-
-            const BUFFER_MIN = 180;
-            const { data: otherLocMatches, error: otherErr } = await supabase
-                .from('matches')
-                .select('id, match_dates_id, locations_id, time, home_id, base1_id, base2_id, base3_id, recorder_id')
-                .in('match_dates_id', dateIds);
-            if (otherErr) console.error('cross-venue 查詢失敗', otherErr);
-
-            const conflictIndex = new Map();
-            const hhmmToMin = (hhmm) => { const [h, m] = (hhmm || '').slice(0, 5).split(':').map(Number); return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null; };
-            (otherLocMatches || []).forEach(m => {
-                const tmin = hhmmToMin(m.time); if (tmin == null) return;
-                const did = String(m.match_dates_id);
-                if (!conflictIndex.has(did)) conflictIndex.set(did, new Map());
-                const mp = conflictIndex.get(did);
-                ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'].forEach(k => {
-                    const pid = m[k]; if (!pid) return;
-                    const key = String(pid);
-                    const arr = mp.get(key) || [];
-                    arr.push({ t: tmin, locId: m.locations_id });
-                    mp.set(key, arr);
-                });
-            });
-
-            function hasCrossVenueConflict(dateId, profileId, hhmm, currentLocId) {
-                if (!profileId || String(profileId).startsWith(GUEST_PREFIX)) return false;
-                const tSelf = hhmmToMin(hhmm); if (tSelf == null) return false;
-                const mp = conflictIndex.get(String(dateId)); if (!mp) return false;
-                const arr = mp.get(String(profileId)); if (!arr) return false;
-                const curLoc = String(currentLocId);
-                return arr.some(({ t, locId }) => String(locId) !== curLoc && Math.abs(t - tSelf) < BUFFER_MIN);
-            }
-
-            const matchIds = rows.map(r => r.id);
-            let guestByKey = new Map();
-
-            if (matchIds.length) {
-                const { data: guestAssigned, error: guestErr } = await supabase
-                    .from('match_guest_assignments')
-                    .select('id, match_id, role, guest_name, guest_note')
-                    .in('match_id', matchIds);
-
-                if (!guestErr && guestAssigned) {
-                    guestAssigned.forEach(g => {
-                        const key = `${String(g.match_id)}:${g.role}`;
-                        guestByKey.set(key, g);
-                    });
-                } else {
-                    console.warn('載入臨時人員失敗：', guestErr);
+                    if (error) throw error;
+                    return { inserted: true };
                 }
-            }
 
-            const groups = new Map();
-            rows.forEach(r => {
-                const key = `${r.match_dates_id}|${r.locations_id}`;
-                if (!groups.has(key)) groups.set(key, []);
-                groups.get(key).push(r);
-            });
-            const groupKeys = Array.from(groups.keys()).sort((a, b) => {
-                const [da] = a.split('|'), [db] = b.split('|');
-                const sa = maps.dates.get(String(da)) || '', sb = maps.dates.get(String(db)) || '';
-                return sa.localeCompare(sb);
-            });
+                const { data: supervisors } = await supabase.from('supervisor').select('id, name').order('name', { ascending: true });
 
-            el.result.innerHTML = groupKeys.map(key => {
-                const [did, lid] = key.split('|');
-                const list = groups.get(key).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+                const BUFFER_MIN = 180;
+                const { data: otherLocMatches, error: otherErr } = await supabase
+                    .from('matches')
+                    .select('id, match_dates_id, locations_id, time, home_id, base1_id, base2_id, base3_id, recorder_id')
+                    .in('match_dates_id', dateIds);
+                if (otherErr) console.error('cross-venue 查詢失敗', otherErr);
 
-                const dLabel = maps.datesLabel.get(String(did)) || maps.dates.get(String(did)) || '';
-                const locName = maps.locs.get(String(lid)) || `場地ID:${lid}`;
-                const gameTitle = (() => {
-                    const set = new Set(list.map(x => x.games_id).filter(Boolean));
-                    const ids = Array.from(set); if (!ids.length) return '';
-                    return '｜ ' + ids.map(id => (maps.games.get(String(id)) || `賽事ID:${id}`)).filter(Boolean).join('、');
-                })();
+                const conflictIndex = new Map();
+                const hhmmToMin = (hhmm) => { const [h, m] = (hhmm || '').slice(0, 5).split(':').map(Number); return Number.isFinite(h) && Number.isFinite(m) ? h * 60 + m : null; };
+                (otherLocMatches || []).forEach(m => {
+                    const tmin = hhmmToMin(m.time); if (tmin == null) return;
+                    const did = String(m.match_dates_id);
+                    if (!conflictIndex.has(did)) conflictIndex.set(did, new Map());
+                    const mp = conflictIndex.get(did);
+                    ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'].forEach(k => {
+                        const pid = m[k]; if (!pid) return;
+                        const key = String(pid);
+                        const arr = mp.get(key) || [];
+                        arr.push({ t: tmin, locId: m.locations_id });
+                        mp.set(key, arr);
+                    });
+                });
 
-                const daySupervisorId = (list.find(x => !!x.supervisor_id)?.supervisor_id) || '';
-                const people = peopleByDate[String(did)] || [];
+                function hasCrossVenueConflict(dateId, profileId, hhmm, currentLocId) {
+                    if (!profileId || String(profileId).startsWith(GUEST_PREFIX)) return false;
+                    const tSelf = hhmmToMin(hhmm); if (tSelf == null) return false;
+                    const mp = conflictIndex.get(String(dateId)); if (!mp) return false;
+                    const arr = mp.get(String(profileId)); if (!arr) return false;
+                    const curLoc = String(currentLocId);
+                    return arr.some(({ t, locId }) => String(locId) !== curLoc && Math.abs(t - tSelf) < BUFFER_MIN);
+                }
 
-                const supOpts = makePersonOptions(
-                    (supervisors || []).map(s => ({ id: String(s.id), name: s.name })),
-                    String(daySupervisorId || ''),
-                    false
-                );
+                const matchIds = rows.map(r => r.id);
+                let guestByKey = new Map();
 
-                const body = list.map(r => {
-                    const t1 = maps.teams.get(String(r.teams_id1)) || r.teams_id1 || '-';
-                    const t2 = maps.teams.get(String(r.teams_id2)) || r.teams_id2 || '-';
-                    const selHome = makePersonOptions(people, r.home_id);
-                    const selB1 = makePersonOptions(people, r.base1_id);
-                    const selB2 = makePersonOptions(people, r.base2_id);
-                    const selB3 = makePersonOptions(people, r.base3_id);
-                    const selRec = makePersonOptions(people, r.recorder_id);
+                if (matchIds.length) {
+                    const { data: guestAssigned, error: guestErr } = await supabase
+                        .from('match_guest_assignments')
+                        .select('id, match_id, role, guest_name, guest_note')
+                        .in('match_id', matchIds);
 
-                    return `
+                    if (!guestErr && guestAssigned) {
+                        guestAssigned.forEach(g => {
+                            const key = `${String(g.match_id)}:${g.role}`;
+                            guestByKey.set(key, g);
+                        });
+                    } else {
+                        console.warn('載入臨時人員失敗：', guestErr);
+                    }
+                }
+
+                const groups = new Map();
+                rows.forEach(r => {
+                    const key = `${r.match_dates_id}|${r.locations_id}`;
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(r);
+                });
+                const groupKeys = Array.from(groups.keys()).sort((a, b) => {
+                    const [da] = a.split('|'), [db] = b.split('|');
+                    const sa = maps.dates.get(String(da)) || '', sb = maps.dates.get(String(db)) || '';
+                    return sa.localeCompare(sb);
+                });
+
+                el.result.innerHTML = groupKeys.map(key => {
+                    const [did, lid] = key.split('|');
+                    const list = groups.get(key).sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+
+                    const dLabel = maps.datesLabel.get(String(did)) || maps.dates.get(String(did)) || '';
+                    const locName = maps.locs.get(String(lid)) || `場地ID:${lid}`;
+                    const isoDate = maps.dates.get(String(did)) || ''; // yyyy-mm-dd
+                    const gameTitle = (() => {
+                        const set = new Set(list.map(x => x.games_id).filter(Boolean));
+                        const ids = Array.from(set); if (!ids.length) return '';
+                        return '｜ ' + ids.map(id => (maps.games.get(String(id)) || `賽事ID:${id}`)).filter(Boolean).join('、');
+                    })();
+
+                    const daySupervisorId = (list.find(x => !!x.supervisor_id)?.supervisor_id) || '';
+                    const people = peopleByDate[String(did)] || [];
+
+                    const supOpts = makePersonOptions(
+                        (supervisors || []).map(s => ({ id: String(s.id), name: s.name })),
+                        String(daySupervisorId || ''),
+                        false
+                    );
+
+                    const body = list.map(r => {
+                        const t1 = maps.teams.get(String(r.teams_id1)) || r.teams_id1 || '-';
+                        const t2 = maps.teams.get(String(r.teams_id2)) || r.teams_id2 || '-';
+                        const selHome = makePersonOptions(people, r.home_id);
+                        const selB1 = makePersonOptions(people, r.base1_id);
+                        const selB2 = makePersonOptions(people, r.base2_id);
+                        const selB3 = makePersonOptions(people, r.base3_id);
+                        const selRec = makePersonOptions(people, r.recorder_id);
+
+                        return `
                             <tr data-id="${r.id}" data-time="${(r.time || '').slice(0, 5)}" data-loc="${lid}" data-date="${did}">
                                 <td class="border px-2 py-1 text-center">${r.session || '-'}</td>
                                 <td class="border px-2 py-1 text-center whitespace-nowrap">${(r.time || '').slice(0, 5) || '-'}</td>
@@ -462,33 +455,33 @@
                                 </td>
                             </tr>
                             `;
-                }).join('');
+                    }).join('');
 
-                return `
+                    return `
                         <div class="group rounded-xl border border-blue-300 overflow-hidden" data-date="${did}" data-loc="${lid}">
-                        <div class="bg-blue-50 px-4 py-3 font-semibold text-xl text-center">
+                        <div class="bg-blue-50 px-4 py-3 font-semibold text-xl text-center relative">
                             ${dLabel} ${gameTitle} ｜ 地點：${locName}
                         </div>
                         <div class="overflow-x-auto">
                             <div class="min-w-[1100px]">
-                                <table class="w-full text-lg bg-white text-center">
-                                    <thead class="bg-blue-100 text-blue-800">
-                                        <tr>
-                                            <th class="border px-2 py-1">場次</th>
-                                            <th class="border px-2 py-1">時間</th>
-                                            <th class="border px-2 py-1">先攻</th>
-                                            <th class="border px-2 py-1">VS</th>
-                                            <th class="border px-2 py-1">後攻</th>
-                                            <th class="border px-2 py-1">主審</th>
-                                            <th class="border px-2 py-1">一壘審</th>
-                                            <th class="border px-2 py-1">二壘審</th>
-                                            <th class="border px-2 py-1">三壘審</th>
-                                            <th class="border px-2 py-1">記錄</th>
-                                            <th class="border px-2 py-1">備註</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody data-date="${did}" data-loc="${lid}">${body}</tbody>
-                                </table>
+                            <table class="w-full text-lg bg-white text-center">
+                                <thead class="bg-blue-100 text-blue-800">
+                                <tr>
+                                    <th class="border px-2 py-1">場次</th>
+                                    <th class="border px-2 py-1">時間</th>
+                                    <th class="border px-2 py-1">先攻</th>
+                                    <th class="border px-2 py-1">VS</th>
+                                    <th class="border px-2 py-1">後攻</th>
+                                    <th class="border px-2 py-1">主審</th>
+                                    <th class="border px-2 py-1">一壘審</th>
+                                    <th class="border px-2 py-1">二壘審</th>
+                                    <th class="border px-2 py-1">三壘審</th>
+                                    <th class="border px-2 py-1">記錄</th>
+                                    <th class="border px-2 py-1">備註</th>
+                                </tr>
+                                </thead>
+                                <tbody data-date="${did}" data-loc="${lid}">${body}</tbody>
+                            </table>
                             </div>
                         </div>
                         <div class="px-4 py-3 border-t bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -502,334 +495,510 @@
                             <div class="text-sm ${list.every(x => x.upload) ? 'text-green-600' : 'text-red-600'} font-medium">
                                 ${list.every(x => x.upload) ? '✔ 已上傳' : '✘ 尚未上傳'}
                             </div>
-                            <div class="flex gap-3">
-                                <button class="btn-save-day px-4 py-2 bg-green-600 text-white rounded" data-date="${did}" data-loc="${lid}">
-                                儲存/取消上傳
-                                </button>
-                                <button class="btn-upload-day px-4 py-2 bg-blue-600 text-white rounded" data-date="${did}" data-loc="${lid}">
-                                上傳
-                                </button>
-                            </div>
+                                <div class="flex gap-3">
+                                    <button class="btn-save-day px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" data-date="${did}" data-loc="${lid}">
+                                        儲存/取消上傳
+                                    </button>
+                                    <button class="btn-upload-day px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700" data-date="${did}" data-loc="${lid}">
+                                        上傳
+                                    </button>
+                                    <button
+                                        class="btn-download-pdf px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                        data-date="${did}" data-loc="${lid}"
+                                        data-title="${dLabel.replace(/"/g, '&quot;')}${gameTitle.replace(/"/g, '&quot;')}｜ 地點：${locName.replace(/"/g, '&quot;')}"
+                                        data-filename="${locName.replace(/[\\/:*?"<>|]/g, '_')}-${isoDate}">
+                                        下載班表
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         </div>
                     `;
-            }).join('');
+                }).join('');
 
-            el.result.querySelectorAll('select[name$="_id"]').forEach(attachNotePreview);
-            el.result.querySelectorAll('.day-supervisor').forEach(attachNotePreview);
+                el.result.querySelectorAll('select[name$="_id"]').forEach(attachNotePreview);
+                el.result.querySelectorAll('.day-supervisor').forEach(attachNotePreview);
 
-            const UNIQUE_KEYS = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
+                const UNIQUE_KEYS = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
 
-            (function applyGuestSelections() {
-                const ROLE_KEYS = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
+                (function applyGuestSelections() {
+                    const ROLE_KEYS = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
+                    el.result.querySelectorAll('tbody tr[data-id]').forEach(tr => {
+                        const matchId = tr.getAttribute('data-id');
+                        ROLE_KEYS.forEach(role => {
+                            const key = `${String(matchId)}:${role}`;
+                            const row = guestByKey.get(key);
+                            if (!row) return;
 
-                el.result.querySelectorAll('tbody tr[data-id]').forEach(tr => {
+                            guestPickMap.set(key, {
+                                id: row.id || 'from-db',
+                                name: row.guest_name,
+                                note: row.guest_note || ''
+                            });
+
+                            const sel = tr.querySelector(`select[name="${role}"]`);
+                            if (!sel) return;
+
+                            const opt = document.createElement('option');
+                            opt.value = `guest:${row.id || 'from-db'}`;
+                            opt.textContent = `*${row.guest_name}`;
+                            if (row.guest_note) opt.setAttribute('data-note', row.guest_note);
+
+                            const addOpt = Array.from(sel.options).find(o => o.value === GUEST_ADD_VALUE);
+                            if (addOpt) sel.insertBefore(opt, addOpt);
+                            else sel.appendChild(opt);
+
+                            sel.value = opt.value;
+                            sel.dispatchEvent(new Event('change'));
+                        });
+                    });
+                })();
+
+                function updateRowOptionLocks(tr) {
+                    const chosen = new Set(UNIQUE_KEYS.map(k => tr.querySelector(`select[name="${k}"]`)?.value).filter(Boolean));
+                    const tbody = tr.closest('tbody');
+                    const dateId = tbody?.getAttribute('data-date');
+                    const rowTime = tr.getAttribute('data-time');
+                    const currentLocId = tr.getAttribute('data-loc');
+
+                    UNIQUE_KEYS.forEach(k => {
+                        const select = tr.querySelector(`select[name="${k}"]`);
+                        if (!select) return;
+
+                        Array.from(select.options).forEach(opt => opt.disabled = false);
+
+                        Array.from(select.options).forEach(opt => {
+                            if (!opt.value || String(opt.value).startsWith(GUEST_PREFIX)) return;
+                            const duplicateInRow = chosen.has(opt.value) && opt.value !== select.value;
+                            const crossVenue = hasCrossVenueConflict(dateId, opt.value, rowTime, currentLocId);
+                            if (duplicateInRow || crossVenue) {
+                                if (opt.value !== select.value) opt.disabled = true;
+                            }
+                        });
+                    });
+                }
+
+                function attachUniqueHandlersToRow(tr) {
+                    const tbody = tr.closest('tbody');
+                    const dateId = tbody?.getAttribute('data-date');
+                    const rowTime = tr.getAttribute('data-time');
+                    const currentLocId = tr.getAttribute('data-loc');
                     const matchId = tr.getAttribute('data-id');
 
-                    ROLE_KEYS.forEach(role => {
-                        const key = `${String(matchId)}:${role}`;
-                        const row = guestByKey.get(key);
-                        if (!row) return;
+                    const handleGuestAdd = (select, roleKey) => {
+                        if (select.value !== GUEST_ADD_VALUE) return;
 
-                        guestPickMap.set(key, {
-                            id: row.id || 'from-db',
-                            name: row.guest_name,
-                            note: row.guest_note || ''
-                        });
+                        const name = (prompt('輸入臨時人員姓名：') || '').trim();
+                        if (!name) { select.value = ''; return; }
+                        const note = (prompt('備註（可留空）：') || '').trim();
 
-                        const sel = tr.querySelector(`select[name="${role}"]`);
-                        if (!sel) return;
+                        const gid = uuid4();
+                        const key = `${matchId}:${roleKey}`;
+                        guestPickMap.set(key, { id: gid, name, note });
 
                         const opt = document.createElement('option');
-                        opt.value = `guest:${row.id || 'from-db'}`;
-                        opt.textContent = `*${row.guest_name}`;
-                        if (row.guest_note) opt.setAttribute('data-note', row.guest_note);
-
-                        const addOpt = Array.from(sel.options).find(o => o.value === GUEST_ADD_VALUE);
-                        if (addOpt) sel.insertBefore(opt, addOpt);
-                        else sel.appendChild(opt);
-
-                        sel.value = opt.value;
-                        sel.dispatchEvent(new Event('change'));
-                    });
-                });
-            })();
-
-            function updateRowOptionLocks(tr) {
-                const chosen = new Set(UNIQUE_KEYS.map(k => tr.querySelector(`select[name="${k}"]`)?.value).filter(Boolean));
-                const tbody = tr.closest('tbody');
-                const dateId = tbody?.getAttribute('data-date');
-                const rowTime = tr.getAttribute('data-time');
-                const currentLocId = tr.getAttribute('data-loc');
-
-                UNIQUE_KEYS.forEach(k => {
-                    const select = tr.querySelector(`select[name="${k}"]`);
-                    if (!select) return;
-
-                    Array.from(select.options).forEach(opt => opt.disabled = false);
-
-                    Array.from(select.options).forEach(opt => {
-                        if (!opt.value || String(opt.value).startsWith(GUEST_PREFIX)) return;
-                        const duplicateInRow = chosen.has(opt.value) && opt.value !== select.value;
-                        const crossVenue = hasCrossVenueConflict(dateId, opt.value, rowTime, currentLocId);
-                        if (duplicateInRow || crossVenue) {
-                            if (opt.value !== select.value) opt.disabled = true;
-                        }
-                    });
-                });
-            }
-
-            function attachUniqueHandlersToRow(tr) {
-                const tbody = tr.closest('tbody');
-                const dateId = tbody?.getAttribute('data-date');
-                const rowTime = tr.getAttribute('data-time');
-                const currentLocId = tr.getAttribute('data-loc');
-                const matchId = tr.getAttribute('data-id');
-
-                const handleGuestAdd = (select, roleKey) => {
-                    if (select.value !== GUEST_ADD_VALUE) return;
-
-                    const name = (prompt('輸入臨時人員姓名：') || '').trim();
-                    if (!name) { select.value = ''; return; }
-                    const note = (prompt('備註（可留空）：') || '').trim();
-
-                    const gid = uuid4();
-                    const key = `${matchId}:${roleKey}`;
-                    guestPickMap.set(key, { id: gid, name, note });
-
-                    const opt = document.createElement('option');
-                    opt.value = `${GUEST_PREFIX}${gid}`;
-                    opt.textContent = `*${name}`;
-                    opt.setAttribute('data-note', note);
-                    const addOpt = Array.from(select.options).find(o => o.value === GUEST_ADD_VALUE);
-                    if (addOpt) select.insertBefore(opt, addOpt); else select.appendChild(opt);
-                    select.value = opt.value;
-
-                    updateRowOptionLocks(tr);
-                };
-
-                UNIQUE_KEYS.forEach(k => {
-                    const select = tr.querySelector(`select[name="${k}"]`);
-                    if (!select) return;
-
-                    select.addEventListener('change', () => {
-                        if (select.value === GUEST_ADD_VALUE) {
-                            handleGuestAdd(select, k);
-                            return;
-                        }
-
-                        const val = select.value || '';
-                        if (!val) { updateRowOptionLocks(tr); return; }
-
-                        if (!String(val).startsWith(GUEST_PREFIX)) {
-                            let conflictAt = '';
-                            UNIQUE_KEYS.forEach(other => {
-                                if (other === k) return;
-                                const otherSel = tr.querySelector(`select[name="${other}"]`);
-                                if (otherSel && otherSel.value && otherSel.value === val) conflictAt = other;
-                            });
-                            if (conflictAt) {
-                                select.value = '';
-                                updateRowOptionLocks(tr);
-                                return alert('同一場的裁判/記錄不可重複。');
-                            }
-
-                            if (hasCrossVenueConflict(dateId, val, rowTime, currentLocId)) {
-                                select.value = '';
-                                updateRowOptionLocks(tr);
-                                return alert(`同一天其他場地在 ${rowTime}（±${BUFFER_MIN} 分）已有該人員的指派。`);
-                            }
-                        }
+                        opt.value = `${GUEST_PREFIX}${gid}`;
+                        opt.textContent = `*${name}`;
+                        opt.setAttribute('data-note', note);
+                        const addOpt = Array.from(select.options).find(o => o.value === GUEST_ADD_VALUE);
+                        if (addOpt) select.insertBefore(opt, addOpt); else select.appendChild(opt);
+                        select.value = opt.value;
 
                         updateRowOptionLocks(tr);
-                    });
-                });
+                    };
 
-                updateRowOptionLocks(tr);
-            }
+                    UNIQUE_KEYS.forEach(k => {
+                        const select = tr.querySelector(`select[name="${k}"]`);
+                        if (!select) return;
 
-            el.result.querySelectorAll('tbody tr[data-id]').forEach(tr => attachUniqueHandlersToRow(tr));
-
-            async function saveOneGroup(dateId, locId, uploadFlag) {
-                const thresholdMinutes = 180;
-
-                const groupEl = el.result.querySelector(`.group[data-date="${dateId}"][data-loc="${locId}"]`);
-                if (!groupEl) { alert('找不到指定的表格'); return; }
-
-                const tbody = groupEl.querySelector(`tbody[data-date="${dateId}"][data-loc="${locId}"]`);
-                const supervisorSel = groupEl.querySelector(`.day-supervisor[data-date="${dateId}"][data-loc="${locId}"]`);
-                const supervisor_id = supervisorSel ? (supervisorSel.value || null) : null;
-
-                const trs = tbody.querySelectorAll('tr[data-id]');
-
-                const UNIQUE_KEYS_LOCAL = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
-                for (const tr of trs) {
-                    const picks = [];
-                    UNIQUE_KEYS_LOCAL.forEach(k => {
-                        const v = tr.querySelector(`select[name="${k}"]`)?.value || '';
-                        if (v && !String(v).startsWith(GUEST_PREFIX)) picks.push({ k, v });
-                    });
-                    const seen = new Set();
-                    for (const p of picks) {
-                        if (seen.has(p.v)) {
-                            alert('同一場比賽的裁判不可重複指派（裁判/記錄需為不同人）。\n請先修正再儲存/上傳。');
-                            tr.querySelector(`select[name="${p.k}"]`)?.focus();
-                            return;
-                        }
-                        seen.add(p.v);
-                    }
-                }
-
-                const hhmmToMinutes = (hhmm) => {
-                    if (!hhmm || !/^\d{2}:\d{2}/.test(hhmm)) return null;
-                    const [h, m] = hhmm.split(':').map(n => parseInt(n, 10));
-                    if (Number.isNaN(h) || Number.isNaN(m)) return null;
-                    return h * 60 + m;
-                };
-                const nameOf = (uid) => {
-                    const opt = tbody.querySelector(`select[name$="_id"] option[value="${uid}"]`);
-                    return opt ? opt.textContent.trim() : `ID:${uid}`;
-                };
-
-                const currentDayAssignments = new Map();
-                const matchMeta = new Map();
-
-                trs.forEach(tr => {
-                    const matchId = tr.getAttribute('data-id');
-                    const timeText = tr.getAttribute('data-time') || tr.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
-                    const timeMin = hhmmToMinutes(timeText);
-                    if (timeMin == null) return;
-
-                    matchMeta.set(matchId, { time: timeText, locId: String(locId), locName: (maps.locs.get(String(locId)) || '') });
-
-                    UNIQUE_KEYS_LOCAL.forEach(k => {
-                        const uid = tr.querySelector(`select[name="${k}"]`)?.value || '';
-                        if (!uid || String(uid).startsWith(GUEST_PREFIX)) return;
-                        if (!currentDayAssignments.has(uid)) currentDayAssignments.set(uid, []);
-                        currentDayAssignments.get(uid).push({ matchId, timeMin, locId: String(locId), source: 'DOM' });
-                    });
-                });
-
-                const acc = conflictIndex.get(String(dateId)) || new Map();
-                for (const [uid, recs] of currentDayAssignments.entries()) {
-                    const others = acc.get(String(uid)) || [];
-                    others.forEach(({ t, locId: otherLoc }) => {
-                        if (String(otherLoc) !== String(locId)) recs.push({ matchId: `X-${t}-${otherLoc}`, timeMin: t, locId: String(otherLoc), source: 'DB' });
-                    });
-
-                    recs.sort((a, b) => a.timeMin - b.timeMin);
-                    for (let i = 0; i < recs.length; i++) {
-                        for (let j = i + 1; j < recs.length; j++) {
-                            if (String(recs[i].locId) === String(recs[j].locId)) continue;
-                            const dt = Math.abs(recs[i].timeMin - recs[j].timeMin);
-                            if (dt < thresholdMinutes) {
-                                const pName = nameOf(uid);
-                                const m1 = matchMeta.get(recs[i].matchId);
-                                const m2 = matchMeta.get(recs[j].matchId);
-                                const m1Text = m1 ? `${m1.time} @ ${m1.locName}` : `比賽ID:${recs[i].matchId}`;
-                                const m2Text = m2 ? `${m2.time} @ ${m2.locName}` : `比賽ID:${recs[j].matchId}`;
-                                alert(`【跨場地時間衝突】\n裁判：${pName}\n${m1Text}\n與\n${m2Text}\n開賽時間相差小於 ${thresholdMinutes} 分鐘，請調整人員或時間後再儲存/上傳。`);
+                        select.addEventListener('change', () => {
+                            if (select.value === GUEST_ADD_VALUE) {
+                                handleGuestAdd(select, k);
                                 return;
                             }
-                        }
-                    }
-                }
 
-                const updates = [];
-                const guestRows = [];
-                const guestKeysToDelete = new Set();
+                            const val = select.value || '';
+                            if (!val) { updateRowOptionLocks(tr); return; }
 
-                trs.forEach(tr => {
-                    const matchId = String(tr.getAttribute('data-id'));
-                    const payload = { upload: uploadFlag, supervisor_id };
-
-                    UNIQUE_KEYS_LOCAL.forEach(k => {
-                        const sel = tr.querySelector(`select[name="${k}"]`);
-                        const v = sel ? (sel.value || null) : null;
-                        const key = `${matchId}:${k}`;
-
-                        if (v && String(v).startsWith(GUEST_PREFIX)) {
-                            payload[k] = null;
-
-                            const gp = guestPickMap.get(key);
-                            if (gp && gp.name) {
-                                guestRows.push({
-                                    match_id: matchId,
-                                    role: k,
-                                    guest_name: gp.name,
-                                    guest_note: gp.note || null,
+                            if (!String(val).startsWith(GUEST_PREFIX)) {
+                                let conflictAt = '';
+                                UNIQUE_KEYS.forEach(other => {
+                                    if (other === k) return;
+                                    const otherSel = tr.querySelector(`select[name="${other}"]`);
+                                    if (otherSel && otherSel.value && otherSel.value === val) conflictAt = other;
                                 });
+                                if (conflictAt) {
+                                    select.value = '';
+                                    updateRowOptionLocks(tr);
+                                    return alert('同一場的裁判/記錄不可重複。');
+                                }
+
+                                if (hasCrossVenueConflict(dateId, val, rowTime, currentLocId)) {
+                                    select.value = '';
+                                    updateRowOptionLocks(tr);
+                                    return alert(`同一天其他場地在 ${rowTime}（±${BUFFER_MIN} 分）已有該人員的指派。`);
+                                }
                             }
-                        } else {
-                            payload[k] = v ? v : null;
-                            guestKeysToDelete.add(key);
-                            guestPickMap.delete(key);
-                        }
+
+                            updateRowOptionLocks(tr);
+                        });
                     });
 
-                    const remark = tr.querySelector('input[name="remark"]')?.value ?? null;
-                    payload.remark = (remark && remark.trim()) ? remark.trim() : null;
-                    updates.push({ id: matchId, payload });
-                });
-
-                for (const u of updates) {
-                    const { error: updErr } = await supabase.from('matches').update(u.payload).eq('id', u.id);
-                    if (updErr) {
-                        console.error('更新失敗 payload=', u.payload, 'err=', updErr);
-                        alert('部分資料更新失敗（寫入 matches）。\n' + (updErr.message || ''));
-                        return;
-                    }
+                    updateRowOptionLocks(tr);
                 }
 
-                try {
-                    for (const key of guestKeysToDelete) {
-                        const [mid, role] = key.split(':');
-                        await supabase.from('match_guest_assignments')
-                            .delete()
-                            .eq('match_id', mid)
-                            .eq('role', role);
-                    }
-                } catch (e) {
-                    console.warn('刪除舊臨時人員時例外（不影響 matches）：', e);
-                }
+                el.result.querySelectorAll('tbody tr[data-id]').forEach(tr => attachUniqueHandlersToRow(tr));
 
-                if (guestRows.length) {
+                async function saveOneGroup(dateId, locId, uploadFlag) {
+                    const thresholdMinutes = 180;
+
+                    const groupEl = el.result.querySelector(`.group[data-date="${dateId}"][data-loc="${locId}"]`);
+                    if (!groupEl) { alert('找不到指定的表格'); return; }
+
+                    const tbody = groupEl.querySelector(`tbody[data-date="${dateId}"][data-loc="${locId}"]`);
+                    const supervisorSel = groupEl.querySelector(`.day-supervisor[data-date="${dateId}"][data-loc="${locId}"]`);
+                    const supervisor_id = supervisorSel ? (supervisorSel.value || null) : null;
+
+                    const trs = tbody.querySelectorAll('tr[data-id]');
+
+                    const UNIQUE_KEYS_LOCAL = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
+                    for (const tr of trs) {
+                        const picks = [];
+                        UNIQUE_KEYS_LOCAL.forEach(k => {
+                            const v = tr.querySelector(`select[name="${k}"]`)?.value || '';
+                            if (v && !String(v).startsWith(GUEST_PREFIX)) picks.push({ k, v });
+                        });
+                        const seen = new Set();
+                        for (const p of picks) {
+                            if (seen.has(p.v)) {
+                                alert('同一場比賽的裁判不可重複指派（裁判/記錄需為不同人）。\n請先修正再儲存/上傳。');
+                                tr.querySelector(`select[name="${p.k}"]`)?.focus();
+                                return;
+                            }
+                            seen.add(p.v);
+                        }
+                    }
+
+                    const hhmmToMinutes = (hhmm) => {
+                        if (!hhmm || !/^\d{2}:\d{2}/.test(hhmm)) return null;
+                        const [h, m] = hhmm.split(':').map(n => parseInt(n, 10));
+                        if (Number.isNaN(h) || Number.isNaN(m)) return null;
+                        return h * 60 + m;
+                    };
+                    const nameOf = (uid) => {
+                        const opt = tbody.querySelector(`select[name$="_id"] option[value="${uid}"]`);
+                        return opt ? opt.textContent.trim() : `ID:${uid}`;
+                    };
+
+                    const currentDayAssignments = new Map();
+                    const matchMeta = new Map();
+
+                    trs.forEach(tr => {
+                        const matchId = tr.getAttribute('data-id');
+                        const timeText = tr.getAttribute('data-time') || tr.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
+                        const timeMin = hhmmToMinutes(timeText);
+                        if (timeMin == null) return;
+
+                        matchMeta.set(matchId, { time: timeText, locId: String(locId), locName: (maps.locs.get(String(locId)) || '') });
+
+                        UNIQUE_KEYS_LOCAL.forEach(k => {
+                            const uid = tr.querySelector(`select[name="${k}"]`)?.value || '';
+                            if (!uid || String(uid).startsWith(GUEST_PREFIX)) return;
+                            if (!currentDayAssignments.has(uid)) currentDayAssignments.set(uid, []);
+                            currentDayAssignments.get(uid).push({ matchId, timeMin, locId: String(locId), source: 'DOM' });
+                        });
+                    });
+
+                    const acc = conflictIndex.get(String(dateId)) || new Map();
+                    for (const [uid, recs] of currentDayAssignments.entries()) {
+                        const others = acc.get(String(uid)) || [];
+                        others.forEach(({ t, locId: otherLoc }) => {
+                            if (String(otherLoc) !== String(locId)) recs.push({ matchId: `X-${t}-${otherLoc}`, timeMin: t, locId: String(otherLoc), source: 'DB' });
+                        });
+
+                        recs.sort((a, b) => a.timeMin - b.timeMin);
+                        for (let i = 0; i < recs.length; i++) {
+                            for (let j = i + 1; j < recs.length; j++) {
+                                if (String(recs[i].locId) === String(recs[j].locId)) continue;
+                                const dt = Math.abs(recs[i].timeMin - recs[j].timeMin);
+                                if (dt < 180) {
+                                    const pName = nameOf(uid);
+                                    const m1 = matchMeta.get(recs[i].matchId);
+                                    const m2 = matchMeta.get(recs[j].matchId);
+                                    const m1Text = m1 ? `${m1.time} @ ${m1.locName}` : `比賽ID:${recs[i].matchId}`;
+                                    const m2Text = m2 ? `${m2.time} @ ${m2.locName}` : `比賽ID:${recs[j].matchId}`;
+                                    alert(`【跨場地時間衝突】\n裁判：${pName}\n${m1Text}\n與\n${m2Text}\n開賽時間相差小於 180 分鐘，請調整人員或時間後再儲存/上傳。`);
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
+                    const updates = [];
+                    const guestRows = [];
+                    const guestKeysToDelete = new Set();
+
+                    trs.forEach(tr => {
+                        const matchId = String(tr.getAttribute('data-id'));
+                        const payload = { upload: uploadFlag, supervisor_id };
+
+                        UNIQUE_KEYS_LOCAL.forEach(k => {
+                            const sel = tr.querySelector(`select[name="${k}"]`);
+                            const v = sel ? (sel.value || null) : null;
+                            const key = `${matchId}:${k}`;
+
+                            if (v && String(v).startsWith(GUEST_PREFIX)) {
+                                payload[k] = null;
+
+                                const gp = guestPickMap.get(key);
+                                if (gp && gp.name) {
+                                    guestRows.push({
+                                        match_id: matchId,
+                                        role: k,
+                                        guest_name: gp.name,
+                                        guest_note: gp.note || null,
+                                    });
+                                }
+                            } else {
+                                payload[k] = v ? v : null;
+                                guestKeysToDelete.add(key);
+                                guestPickMap.delete(key);
+                            }
+                        });
+
+                        const remark = tr.querySelector('input[name="remark"]')?.value ?? null;
+                        payload.remark = (remark && remark.trim()) ? remark.trim() : null;
+                        updates.push({ id: matchId, payload });
+                    });
+
+                    for (const u of updates) {
+                        const { error: updErr } = await supabase.from('matches').update(u.payload).eq('id', u.id);
+                        if (updErr) {
+                            console.error('更新失敗 payload=', u.payload, 'err=', updErr);
+                            alert('部分資料更新失敗（寫入 matches）。\n' + (updErr.message || ''));
+                            return;
+                        }
+                    }
+
                     try {
-                        const uniqKeys = new Set(guestRows.map(g => `${g.match_id}:${g.role}`));
-                        for (const key of uniqKeys) {
+                        for (const key of guestKeysToDelete) {
                             const [mid, role] = key.split(':');
                             await supabase.from('match_guest_assignments')
                                 .delete()
                                 .eq('match_id', mid)
                                 .eq('role', role);
                         }
-                        const { error: insErr } = await supabase.from('match_guest_assignments').insert(guestRows);
-                        if (insErr) {
-                            console.warn('寫入臨時人員失敗（不影響 matches）：', insErr);
-                        }
                     } catch (e) {
-                        console.warn('寫入臨時人員時例外（不影響 matches）：', e);
+                        console.warn('刪除舊臨時人員時例外（不影響 matches）：', e);
                     }
+
+                    if (guestRows.length) {
+                        try {
+                            const uniqKeys = new Set(guestRows.map(g => `${g.match_id}:${g.role}`));
+                            for (const key of uniqKeys) {
+                                const [mid, role] = key.split(':');
+                                await supabase.from('match_guest_assignments')
+                                    .delete()
+                                    .eq('match_id', mid)
+                                    .eq('role', role);
+                            }
+                            const { error: insErr } = await supabase.from('match_guest_assignments').insert(guestRows);
+                            if (insErr) {
+                                console.warn('寫入臨時人員失敗（不影響 matches）：', insErr);
+                            }
+                        } catch (e) {
+                            console.warn('寫入臨時人員時例外（不影響 matches）：', e);
+                        }
+                    }
+
+                    showToast(uploadFlag ? '上傳完成！(已將本日裁判表上傳至裁判員頁面)' : '儲存/取消上傳成功！', 'success');
+
+                    const currentDate = el.date.value || null;
+                    const currentLoc = el.loc.value || null;
+                    runQuery({ dateId: currentDate, locId: currentLoc });
                 }
 
-                showToast(uploadFlag ? '上傳完成！(已將本日裁判表上傳至裁判員頁面)' : '儲存/取消上傳成功！', 'success');
+                el.result.addEventListener('click', (e) => {
+                    const saveBtn = e.target.closest('.btn-save-day');
+                    if (saveBtn) { saveOneGroup(saveBtn.dataset.date, saveBtn.dataset.loc, false); return; }
+                    const uploadBtn = e.target.closest('.btn-upload-day');
+                    if (uploadBtn) { saveOneGroup(uploadBtn.dataset.date, uploadBtn.dataset.loc, true); return; }
 
-                const currentDate = el.date.value || null;
-                const currentLoc = el.loc.value || null;
-                runQuery({ dateId: currentDate, locId: currentLoc });
+                    const dlBtn = e.target.closest('.btn-download-pdf');
+                    if (dlBtn) {
+                        const did = dlBtn.getAttribute('data-date');
+                        const lid = dlBtn.getAttribute('data-loc');
+                        const title = dlBtn.getAttribute('data-title') || '班表';
+                        const filename = dlBtn.getAttribute('data-filename') || '班表';
+                        downloadGroupAsPNG(did, lid, title, filename);
+                    }
+                });
+
+                el.tip.textContent = `共 ${rows.length} 場比賽。`;
             }
 
-            el.result.addEventListener('click', (e) => {
-                const saveBtn = e.target.closest('.btn-save-day');
-                if (saveBtn) { saveOneGroup(saveBtn.dataset.date, saveBtn.dataset.loc, false); return; }
-                const uploadBtn = e.target.closest('.btn-upload-day');
-                if (uploadBtn) { saveOneGroup(uploadBtn.dataset.date, uploadBtn.dataset.loc, true); }
+        async function downloadGroupAsPNG(dateId, locId, titleText, filenameBase) {
+            if (downloadGroupAsPNG.__busy) return;
+            downloadGroupAsPNG.__busy = true;
+
+            const release = () => { downloadGroupAsPNG.__busy = false; };
+
+            const groupEl = document.querySelector(`.group[data-date="${dateId}"][data-loc="${locId}"]`);
+            if (!groupEl) { alert('找不到要下載的班表區塊'); release(); return; }
+
+            const table = groupEl.querySelector('table');
+            if (!table) { alert('這個班表沒有可下載的內容'); release(); return; }
+
+            const supSel = groupEl.querySelector(`.day-supervisor[data-date="${dateId}"][data-loc="${locId}"]`);
+            const supervisorText = (() => {
+                if (!supSel) return '—';
+                const opt = supSel.options[supSel.selectedIndex] || Array.from(supSel.options).find(o => o.selected) || null;
+                const t = (opt && opt.textContent.trim()) ? opt.textContent.trim() : '';
+                return t || '—';
+            })();
+
+            const getSelectDisplayText = (sel) => {
+                if (!sel) return '';
+                let txt = sel.options[sel.selectedIndex]?.textContent?.trim();
+                if (!txt) {
+                    const byAttr = Array.from(sel.options).find(o => o.selected);
+                    if (byAttr) txt = byAttr.textContent?.trim();
+                }
+                if (!txt) return '';
+                return txt.replace(/^\*/, '');
+            };
+
+            const cleanTable = table.cloneNode(true);
+            const origRows = table.querySelectorAll('tbody tr');
+            const cloneRows = cleanTable.querySelectorAll('tbody tr');
+            origRows.forEach((origTr, i) => {
+                const cloneTr = cloneRows[i];
+                if (!cloneTr) return;
+                const origSelects = origTr.querySelectorAll('select');
+                const cloneSelects = cloneTr.querySelectorAll('select');
+                origSelects.forEach((origSel, j) => {
+                    const cloneSel = cloneSelects[j];
+                    if (!cloneSel) return;
+                    cloneSel.value = origSel.value;
+                });
             });
 
-            el.tip.textContent = `共 ${rows.length} 場比賽。`;
+            cleanTable.querySelectorAll('tbody tr').forEach((tr, idx) => {
+                if (idx % 2 === 1) tr.style.background = '#f8fbff';
+                tr.querySelectorAll('td').forEach(td => {
+                    const sel = td.querySelector('select');
+                    const inp = td.querySelector('input');
+                    if (sel) {
+                        const text = getSelectDisplayText(sel);
+                        td.innerHTML = `<span>${text}</span>`;
+                    } else if (inp) {
+                        td.innerHTML = `<span>${(inp.value || '').trim()}</span>`;
+                    }
+                });
+            });
+
+            const panel = document.createElement('div');
+            Object.assign(panel.style, {
+                position: 'fixed',
+                left: '-99999px',
+                top: '0',
+                zIndex: '2147483647',
+                display: 'inline-block',
+                width: 'auto',
+                maxWidth: 'none',
+                background: '#ffffff',
+                borderRadius: '12px',
+                boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+                overflow: 'hidden',
+                fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
+                textAlign: 'center'
+            });
+
+            const header = document.createElement('div');
+            header.textContent = (titleText || '班表').replace(/&quot;/g, '"');
+            Object.assign(header.style, {
+                padding: '18px 20px',
+                fontSize: '24px',
+                fontWeight: '800',
+                color: '#fff',
+                background: 'linear-gradient(90deg,#2563eb,#1e40af)',
+                lineHeight: '1.4'
+            });
+            panel.appendChild(header);
+
+            const body = document.createElement('div');
+            Object.assign(body.style, {
+                padding: '14px 18px 8px 18px',
+                background: '#fff'
+            });
+
+            cleanTable.className = '';
+            cleanTable.style.tableLayout = 'auto';
+            cleanTable.style.width = 'auto';
+            cleanTable.style.maxWidth = 'none';
+            cleanTable.style.borderCollapse = 'collapse';
+            cleanTable.style.margin = '0 auto';
+
+            cleanTable.querySelectorAll('th, td').forEach(cell => {
+                const isTH = cell.tagName === 'TH';
+                cell.style.border = '1px solid #cfe0ff';
+                cell.style.padding = '10px 14px';
+                cell.style.fontSize = '18px';
+                cell.style.fontWeight = '700';
+                cell.style.textAlign = 'center';
+                cell.style.verticalAlign = 'middle';
+                cell.style.whiteSpace = 'nowrap';
+                cell.style.color = '#0f172a';
+                cell.style.lineHeight = '1.4';
+                cell.style.background = isTH ? '#eaf2ff' : (cell.style.background || '#fff');
+            });
+
+            body.appendChild(cleanTable);
+
+            const footer = document.createElement('div');
+            footer.textContent = `監場：${supervisorText}`;
+            Object.assign(footer.style, {
+                padding: '12px 6px 16px 6px',
+                fontSize: '18px',
+                fontWeight: '700',
+                color: '#1e3a8a',
+                textAlign: 'center',
+                lineHeight: '1.4'
+            });
+            body.appendChild(footer);
+
+            panel.appendChild(body);
+            document.body.appendChild(panel);
+            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+            try {
+                const canvas = await html2canvas(panel, {
+                    backgroundColor: '#ffffff',
+                    scale: Math.min(Math.max(window.devicePixelRatio || 2, 2), 3),
+                    allowTaint: true,
+                    useCORS: true,
+                    windowWidth: Math.ceil(panel.getBoundingClientRect().width) + 20,
+                    windowHeight: Math.ceil(panel.getBoundingClientRect().height) + 40,
+                    logging: false
+                });
+
+                const dataURL = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = dataURL;
+                const filenameSafe = (filenameBase || '班表').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '');
+                a.download = `${filenameSafe}.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            } catch (err) {
+                console.error(err);
+                alert('下載圖片失敗，請再試一次');
+            } finally {
+                document.body.removeChild(panel);
+                release();
+            }
         }
-    });
+        });
 
     document.getElementById('btn-view-registrations').addEventListener('click', async () => {
         contentArea.innerHTML = `
