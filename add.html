@@ -250,9 +250,14 @@
                 btn.addEventListener('click', async () => {
                     const id = btn.getAttribute('data-id');
                     const label = btn.getAttribute('data-label') || btn.getAttribute('data-date') || '';
-                    if (!confirm(`確定要刪除日期「${label}」？此操作無法復原。`)) return;
+                    if (!confirm(`確定要刪除日期「${label}」的所有賽程？此操作無法復原。`)) return;
+                    const { error: delErr } = await supabase.from('matches').delete().eq('match_dates_id', id);
+                    if (delErr) {
+                        console.error(delErr);
+                        alert('刪除賽事失敗，請稍後再試');
+                    }
                     const { error } = await supabase.from('match_dates').delete().eq('id', id);
-                    if (error) alert('刪除失敗');
+                    if (error) alert('刪除日期失敗');
                     else renderDatesList();
                 });
             });
