@@ -46,6 +46,13 @@
             class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-3xl mx-auto">
             <form id="register-form" class="space-y-6">
                 <h2 class="text-2xl font-bold text-center mb-6">選擇欲報名的日期</h2>
+                <div class="flex items-center justify-center gap-3 mb-4">
+                    <label for="month-select" class="text-2xl font-semibold text-blue-800">選擇月份</label>
+                    <select id="month-select"
+                        class="border border-blue-400 rounded-lg px-4 py-2 bg-white text-blue-900 text-base shadow-sm">
+                        <option value="">載入中...</option>
+                    </select>
+                </div>
                 <div id="date-options" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-blue-800 text-lg">
                     <!-- 比賽日期將在這裡顯示 -->
                 </div>
@@ -90,128 +97,169 @@
         `;
     }
 
-    async function loadMatchDates() {
-        const profileStr = localStorage.getItem('profile');
-        if (!profileStr) {
-            alert('尚未登入');
-            return;
+    // ===== 新增：月份篩選版 報名載入/渲染 =====
+        let __ALL_DATES = [];            // 全部 match_dates
+        let __REGISTERED = [];           // 既有報名
+        let __NOTE_MAP = {};             // 既有備註
+        let __CURRENT_MONTH_KEY = "";    // 目前選到的 YYYY-MM
+        let __CURRENT_MONTH_DATE_IDS = []; // 目前月的 date id 清單（用來做局部刪除）
+
+        async function loadMatchDates() {
+            const profileStr = localStorage.getItem('profile');
+            if (!profileStr) { alert('尚未登入'); return; }
+            const profile = JSON.parse(profileStr);
+            const userId = profile.id;
+
+            // 先載入使用者已報名的日期與備註
+            const { data: registered, error: regError } = await supabase
+                .from('registrations')
+                .select('match_date_id, description')
+                .eq('user_id', userId);
+
+            if (regError) { console.error('❌ 載入報名資料失敗：', regError); return; }
+
+            __REGISTERED = registered || [];
+            __NOTE_MAP = {};
+            __REGISTERED.forEach(r => { __NOTE_MAP[r.match_date_id] = r.description || ''; });
+
+            // 再載入所有比賽日期
+            const { data, error } = await supabase
+                .from('match_dates')
+                .select('id, date')
+                .order('date');
+
+            if (error) { console.error('❌ 載入比賽日期失敗：', error); return; }
+
+            __ALL_DATES = data || [];
+
+            // 依資料動態產生可選月份 (YYYY-MM)
+            const monthKeys = Array.from(new Set(
+                __ALL_DATES.map(d => String(d.date).slice(0, 7))
+            )).sort(); // 由小到大
+
+            const monthSel = document.getElementById('month-select');
+            if (monthKeys.length === 0) {
+                monthSel.innerHTML = `<option value="">無可選月份</option>`;
+                document.getElementById('date-options').innerHTML =
+                    '<div class="text-center text-red-500 col-span-2">目前沒有可報名的比賽日期</div>';
+                return;
+            }
+
+            const nowYM = new Date().toISOString().slice(0, 7);
+            __CURRENT_MONTH_KEY = monthKeys.includes(nowYM) ? nowYM : monthKeys[0];
+
+            monthSel.innerHTML = monthKeys
+                .map(ym => `<option value="${ym}">${ym}</option>`)
+                .join('');
+            monthSel.value = __CURRENT_MONTH_KEY;
+
+            // 初次渲染當月
+            renderMonth(__CURRENT_MONTH_KEY);
+
+            // 切換月份時重新渲染
+            monthSel.addEventListener('change', () => {
+                __CURRENT_MONTH_KEY = monthSel.value;
+                renderMonth(__CURRENT_MONTH_KEY);
+            });
         }
-        const profile = JSON.parse(profileStr);
-        const userId = profile.id;
 
-        const { data: registered, error: regError } = await supabase
-            .from('registrations')
-            .select('match_date_id, description')
-            .eq('user_id', userId);
+        function renderMonth(ym) {
+            const container = document.getElementById('date-options');
+            const registeredIds = new Set(__REGISTERED.map(r => String(r.match_date_id)));
 
-        if (regError) {
-            console.error('❌ 載入報名資料失敗：', regError);
-            return;
+            const filtered = __ALL_DATES.filter(d => String(d.date).slice(0, 7) === ym);
+            __CURRENT_MONTH_DATE_IDS = filtered.map(d => d.id);
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+        <div class="text-center text-blue-800 col-span-2">這個月份沒有可報名的比賽日期</div>`;
+                return;
+            }
+
+            container.innerHTML = filtered.map(d => {
+                const dateText = new Date(d.date).toLocaleDateString('zh-TW', {
+                    year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                });
+                const isChecked = registeredIds.has(String(d.id)) ? 'checked' : '';
+                const note = __NOTE_MAP[d.id] || '';
+                return `
+        <div class="flex flex-col gap-2 p-4 bg-blue-50 rounded-xl shadow-sm hover:bg-blue-100 transition">
+          <label class="flex items-center space-x-4 cursor-pointer">
+            <input type="checkbox" name="dates" value="${d.id}" ${isChecked}
+                   class="accent-blue-600 w-6 h-6 shrink-0" />
+            <span class="text-xl sm:text-2xl font-semibold">${dateText}</span>
+          </label>
+          <input type="text" name="note-${d.id}" placeholder="備註（可不填）"
+                 value="${note.replace(/"/g, '&quot;')}"
+                 class="w-full px-3 py-2 rounded-md border border-blue-300 text-base text-blue-800 bg-white" />
+        </div>`;
+            }).join('');
         }
 
-        const registeredIds = registered.map(r => r.match_date_id);
-        const noteMap = {};
-        registered.forEach(r => {
-            noteMap[r.match_date_id] = r.description || '';
-        });
+        // 送出：只更新「目前月份」的報名（不動其它月份）
+        document.getElementById('register-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
 
-        const { data, error } = await supabase
-            .from('match_dates')
-            .select('id, date')
-            .order('date');
+            const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
+            const selectedDateIds = Array.from(checkboxes).map(cb => cb.value);
 
-        if (error) {
-            console.error('❌ 載入比賽日期失敗：', error);
-            return;
-        }
+            const profileStr = localStorage.getItem('profile');
+            if (!profileStr) { alert('尚未登入'); return; }
+            const profile = JSON.parse(profileStr);
+            const userId = profile.id;
 
-        const container = document.getElementById('date-options');
-        if (!data || data.length === 0) {
-            container.innerHTML = '<div class="text-center text-red-500 col-span-2">目前沒有可報名的比賽日期</div>';
-            return;
-        }
+            // 先刪掉「目前月份」原有的報名
+            if (__CURRENT_MONTH_DATE_IDS.length > 0) {
+                const { error: deleteError } = await supabase
+                    .from('registrations')
+                    .delete()
+                    .eq('user_id', userId)
+                    .in('match_date_id', __CURRENT_MONTH_DATE_IDS);
 
-        container.innerHTML = data.map(d => {
-            const dateText = new Date(d.date).toLocaleDateString('zh-TW', {
-                year: 'numeric', month: 'long', day: 'numeric', weekday: 'short'
+                if (deleteError) {
+                    console.error('❌ 刪除舊報名失敗', deleteError);
+                    alert('更新失敗（刪除舊資料失敗）');
+                    return;
+                }
+            }
+
+            // 再新增目前月份「勾選」的報名
+            const insertData = selectedDateIds.map(id => {
+                const noteInput = document.querySelector(`input[name="note-${id}"]`);
+                const note = noteInput ? noteInput.value.trim() : '';
+                return {
+                    user_id: userId,
+                    match_date_id: id,
+                    description: note,
+                    registred_at: new Date().toISOString()
+                };
             });
 
-            const isChecked = registeredIds.includes(d.id) ? 'checked' : '';
+            if (insertData.length > 0) {
+                const { error: insertError } = await supabase.from('registrations').insert(insertData);
+                if (insertError) {
+                    console.error('❌ 報名失敗', insertError);
+                    alert('報名失敗，請稍後再試');
+                    return;
+                }
+            }
 
-            return `
-                <div class="flex flex-col gap-2 p-4 bg-blue-50 rounded-xl shadow-sm hover:bg-blue-100 transition">
-                    <label class="flex items-center space-x-4 cursor-pointer">
-                        <input type="checkbox" name="dates" value="${d.id}" ${isChecked}
-                            class="accent-blue-600 w-6 h-6 shrink-0" />
-                        <span class="text-xl sm:text-2xl font-semibold">${dateText}</span>
-                    </label>
-                    <input type="text" name="note-${d.id}" placeholder="備註（可不填）"
-                        value="${noteMap[d.id] || ''}"
-                        class="w-full px-3 py-2 rounded-md border border-blue-300 text-base text-blue-800 bg-white" />
-                </div>
-                `;
-        }).join('');
-    }
-
-    document.getElementById('register-form').addEventListener('submit', async function (e) {
-        e.preventDefault();
-
-        const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
-
-        const selectedDateIds = Array.from(checkboxes).map(cb => cb.value);
-
-        const profileStr = localStorage.getItem('profile');
-        if (!profileStr) {
-            alert('尚未登入');
-            return;
-        }
-
-        const profile = JSON.parse(profileStr);
-        const userId = profile.id;
-
-        const { error: deleteError } = await supabase
-            .from('registrations')
-            .delete()
-            .eq('user_id', userId);
-
-        if (deleteError) {
-            console.error('❌ 刪除舊報名失敗', deleteError);
-        }
-
-        const insertData = selectedDateIds.map(id => {
-            const noteInput = document.querySelector(`input[name="note-${id}"]`);
-            const note = noteInput ? noteInput.value.trim() : '';
-            return {
-                user_id: userId,
-                match_date_id: id,
-                description: note,
-                registred_at: new Date().toISOString()
-            };
+            alert('已更新本月份的報名！');
+            // 若你原本有別頁需要更新（保持原行為，不變動）
+            const us = document.getElementById('user-select');
+            if (us) us.dispatchEvent(new Event('change'));
+            // 重新載入一次，讓畫面與資料一致
+            loadMatchDates();
         });
 
-
-        const { error: insertError } = await supabase
-            .from('registrations')
-            .insert(insertData);
-
-        if (insertError) {
-            console.error('❌ 報名失敗', insertError);
-            alert('報名失敗，請稍後再試');
-        } else {
-            alert('報名成功！');
-            document.getElementById('user-select').dispatchEvent(new Event('change'));
-        }
-    });
-
-    document.addEventListener('DOMContentLoaded', () => {
-        loadMatchDates();
-    });
+        document.addEventListener('DOMContentLoaded', () => {
+            loadMatchDates();
+        });
 
     document.getElementById('logout-btn').addEventListener('click', function () {
         localStorage.removeItem('profile');
         window.location.href = 'index.html';
     });
 </script>
-
 
 </html>
