@@ -89,12 +89,11 @@
 
             const contentArea = document.getElementById('content-area');
             contentArea.innerHTML = `
-    <h2 class="text-3xl font-bold mb-8 text-center text-blue-900">我的班表</h2>
-    <div id="my-tip" class="text-lg text-center font-medium text-blue-700 mb-4">讀取你報名的日期與班表中…</div>
-    <div id="my-result" class="space-y-10"></div>
-  `;
+                <h2 class="text-3xl font-bold mb-8 text-center text-blue-900">我的班表</h2>
+                <div id="my-tip" class="text-lg text-center font-medium text-blue-700 mb-4">讀取你報名的日期與班表中…</div>
+                <div id="my-result" class="space-y-10"></div>
+            `;
 
-            // 下載圖片用（保留原功能）
             if (!window.html2canvas) {
                 const s = document.createElement('script');
                 s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
@@ -107,7 +106,6 @@
                 result: document.getElementById('my-result'),
             };
 
-            // 1) 找出我「報名過」的所有日期
             el.tip.textContent = '讀取你報名的日期中...';
             const { data: regis, error: regErr } = await supabase
                 .from('registrations')
@@ -119,7 +117,6 @@
             const myDateIds = [...new Set((regis || []).map(r => String(r.match_date_id)))];
             if (myDateIds.length === 0) { el.tip.textContent = '你尚未報名任何日期'; el.result.innerHTML = ''; return; }
 
-            // 2) 取日期資訊，建立顯示/排序用 map
             const { data: dates, error: dateErr } = await supabase
                 .from('match_dates')
                 .select('id, date')
@@ -137,7 +134,6 @@
                 mapDateISO.set(String(d.id), String(d.date).slice(0, 10));
             });
 
-            // 3) 一次撈出「我報名的日期」裡「已上傳」的所有比賽
             el.tip.textContent = '查詢你的所有已上傳班表中…';
             const { data: rows, error } = await supabase
                 .from('matches')
@@ -151,7 +147,6 @@
             if (error) { console.error(error); el.tip.textContent = '查詢失敗，請稍後再試'; return; }
             if (!rows || rows.length === 0) { el.tip.textContent = '沒有可顯示的已上傳班表。'; return; }
 
-            // 4) 臨時人員（guest）名稱
             const matchIds = rows.map(r => r.id);
             const guestNameByKey = new Map();
             if (matchIds.length) {
@@ -166,7 +161,6 @@
                 }
             }
 
-            // 5) 關聯表一次補齊
             const teamIds = new Set(), userIds = new Set(), locIds = new Set(), gameIds = new Set(), supIds = new Set();
             rows.forEach(r => {
                 if (r.teams_id1) teamIds.add(r.teams_id1);
@@ -202,7 +196,6 @@
                 return g || '';
             };
 
-            // 6) 依「日期 → 場地」分組，只輸出「含有我的班」的表
             const byDate = new Map();
             rows.forEach(r => {
                 const did = String(r.match_dates_id || '');
@@ -255,65 +248,65 @@
                         const rowHasMe = hasMe(r);
                         const clsMine = rowHasMe ? 'bg-amber-100 font-semibold text-blue-900' : '';
                         return `
-          <tr class="border-b ${clsMine}">
-            <td class="px-4 py-2 border-2 text-center text-lg">${r.session || '-'}</td>
-            <td class="px-4 py-2 border-2 text-center text-lg">${(r.time || '').slice(0, 5) || '-'}</td>
-            <td class="px-4 py-2 border-2 text-center text-lg">${t1}</td>
-            <td class="px-4 py-2 border-2 text-center text-lg">VS</td>
-            <td class="px-4 py-2 border-2 text-center text-lg">${t2}</td>
-            <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'home_id')}</td>
-            <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'base1_id')}</td>
-            <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'base2_id')}</td>
-            <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'base3_id')}</td>
-            <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'recorder_id')}</td>
-            <td class="px-4 py-2 border-2 text-left text-lg">${r.remark || ''}</td>
-          </tr>
-        `;
+                            <tr class="border-b ${clsMine}">
+                                <td class="px-4 py-2 border-2 text-center text-lg">${r.session || '-'}</td>
+                                <td class="px-4 py-2 border-2 text-center text-lg">${(r.time || '').slice(0, 5) || '-'}</td>
+                                <td class="px-4 py-2 border-2 text-center text-lg">${t1}</td>
+                                <td class="px-4 py-2 border-2 text-center text-lg">VS</td>
+                                <td class="px-4 py-2 border-2 text-center text-lg">${t2}</td>
+                                <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'home_id')}</td>
+                                <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'base1_id')}</td>
+                                <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'base2_id')}</td>
+                                <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'base3_id')}</td>
+                                <td class="px-4 py-2 border-2 text-center text-lg">${nameFor(r, 'recorder_id')}</td>
+                                <td class="px-4 py-2 border-2 text-left text-lg">${r.remark || ''}</td>
+                            </tr>
+                            `;
                     }).join('');
 
                     html += `
-        <div class="rounded-xl border border-blue-400 overflow-hidden shadow-md group" data-date-label="${dateLabel}" data-loc-name="${locName}" data-game-name="${gameName}">
-          <div class="bg-blue-100 px-4 py-3 font-bold text-xl text-center text-blue-900">
-            ${dateLabel} ${gameName ? `｜ ${gameName}` : ''} ｜ 地點：${locDisplay}
-          </div>
-          <div class="overflow-x-auto">
-            <table class="w-full text-md bg-white text-center my-table">
-              <thead class="bg-blue-200 text-blue-900">
-                <tr>
-                  <th class="px-3 py-2 border">場次</th>
-                  <th class="px-3 py-2 border">時間</th>
-                  <th class="px-3 py-2 border">先攻</th>
-                  <th class="px-3 py-2 border"></th>
-                  <th class="px-3 py-2 border">後攻</th>
-                  <th class="px-3 py-2 border">主審</th>
-                  <th class="px-3 py-2 border">一壘審</th>
-                  <th class="px-3 py-2 border">二壘審</th>
-                  <th class="px-3 py-2 border">三壘審</th>
-                  <th class="px-3 py-2 border">紀錄</th>
-                  <th class="px-3 py-2 border">備註</th>
-                </tr>
-              </thead>
-              <tbody>${tbodyHtml}</tbody>
-            </table>
-          </div>
-          <div class="px-4 py-4 bg-slate-100 relative">
-            <div class="font-bold text-2xl text-blue-800
-                        md:absolute md:left-1/2 md:transform md:-translate-x-1/2
-                        text-left md:text-center">
-              監場：<span class="my-supervisor-line">${supervisorLine}</span>
-            </div>
+                        <div class="rounded-xl border border-blue-400 overflow-hidden shadow-md group" data-date-label="${dateLabel}" data-loc-name="${locName}" data-game-name="${gameName}">
+                        <div class="bg-blue-100 px-4 py-3 font-bold text-xl text-center text-blue-900">
+                            ${dateLabel} ${gameName ? `｜ ${gameName}` : ''} ｜ 地點：${locDisplay}
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-md bg-white text-center my-table">
+                            <thead class="bg-blue-200 text-blue-900">
+                                <tr>
+                                <th class="px-3 py-2 border">場次</th>
+                                <th class="px-3 py-2 border">時間</th>
+                                <th class="px-3 py-2 border">先攻</th>
+                                <th class="px-3 py-2 border"></th>
+                                <th class="px-3 py-2 border">後攻</th>
+                                <th class="px-3 py-2 border">主審</th>
+                                <th class="px-3 py-2 border">一壘審</th>
+                                <th class="px-3 py-2 border">二壘審</th>
+                                <th class="px-3 py-2 border">三壘審</th>
+                                <th class="px-3 py-2 border">紀錄</th>
+                                <th class="px-3 py-2 border">備註</th>
+                                </tr>
+                            </thead>
+                            <tbody>${tbodyHtml}</tbody>
+                            </table>
+                        </div>
+                        <div class="px-4 py-4 bg-slate-100 relative">
+                            <div class="font-bold text-2xl text-blue-800
+                                        md:absolute md:left-1/2 md:transform md:-translate-x-1/2
+                                        text-left md:text-center">
+                            監場：<span class="my-supervisor-line">${supervisorLine}</span>
+                            </div>
 
-            <div class="flex justify-end">
-              <button
-                class="btn-my-download px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                data-title="${dateLabel}${gameName ? `｜ ${gameName}` : ''}｜ 地點：${locName}"
-                data-filename="${(locName || '').replace(/[\\/:*?"<>|]/g, '_')}-${dateISO}">
-                  儲存班表
-              </button>
-            </div>
-          </div>
-        </div>
-      `;
+                            <div class="flex justify-end">
+                            <button
+                                class="btn-my-download px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                data-title="${dateLabel}${gameName ? `｜ ${gameName}` : ''}｜ 地點：${locName}"
+                                data-filename="${(locName || '').replace(/[\\/:*?"<>|]/g, '_')}-${dateISO}">
+                                儲存班表
+                            </button>
+                            </div>
+                        </div>
+                        </div>
+                    `;
                 }
             }
 
@@ -326,7 +319,6 @@
             el.result.innerHTML = html;
             el.tip.textContent = '';
 
-            // 下載事件（沿用原本的下載函式）
             el.result.addEventListener('click', (e) => {
                 const btn = e.target.closest('.btn-my-download');
                 if (!btn) return;
@@ -340,7 +332,6 @@
                 downloadMyGroupAsPNG(title, filename, tableEl, supervisorText);
             });
 
-            // ——— 這個函式保留你原本的內容 ———
             async function downloadMyGroupAsPNG(titleText, filenameBase, tableEl, supervisorText) {
                 if (!tableEl) return alert('找不到可下載的表格');
                 if (downloadMyGroupAsPNG.__busy) return;
