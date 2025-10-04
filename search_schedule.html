@@ -228,7 +228,7 @@
         const [tRes, pRes, lRes, gRes, sRes] = await Promise.all([
         teamIds.size ? supabase.from('teams').select('id,name').in('id', Array.from(teamIds)) : Promise.resolve({data: [] }),
         userIds.size ? supabase.from('profiles').select('id,name').in('id', Array.from(userIds)) : Promise.resolve({data: [] }),
-        locIds.size ? supabase.from('locations').select('id,name').in('id', Array.from(locIds)) : Promise.resolve({data: [] }),
+        locIds.size ? supabase.from('locations').select('id,name,url').in('id', Array.from(locIds)) : Promise.resolve({ data: [] }),
         gameIds.size ? supabase.from('games').select('id,name').in('id', Array.from(gameIds)) : Promise.resolve({data: [] }),
         supIds.size ? supabase.from('supervisor').select('id,name').in('id', Array.from(supIds)) : Promise.resolve({data: [] }),
         ]);
@@ -238,6 +238,7 @@
         const mapLoc = new Map((lRes.data || []).map(l => [String(l.id), l.name]));
         const mapSup = new Map((sRes.data || []).map(s => [String(s.id), s.name]));
         const mapGame = new Map((gRes.data || []).map(g => [String(g.id), g.name]));
+        const mapLocUrl = new Map((lRes.data || []).map(l => [String(l.id), l.url || '']));
         const dateLabel = mapDateLabel.get(String(matchDateId)) || String(matchDateId);
         const dateISO = mapDateISO.get(String(matchDateId)) || '';
 
@@ -266,7 +267,13 @@
             if (!listHasMe) continue;
 
             anyOutput = true;
+
             const locName = mapLoc.get(lid) || ('場地ID:' + lid);
+            const locUrl = mapLocUrl.get(lid) || '';
+            const locDisplay = locUrl
+                ? `<a href="${locUrl}" target="_blank" rel="noopener"
+                class="text-blue-900 no-underline hover:underline hover:text-blue-600">${locName}</a>`
+                : locName;
 
             const gameNames = [...new Set(
             list
@@ -310,7 +317,7 @@
             html += `
                 <div class="rounded-xl border border-blue-400 overflow-hidden shadow-md group" data-date-label="${dateLabel}" data-loc-name="${locName}" data-game-name="${gameName}">
                     <div class="bg-blue-100 px-4 py-3 font-bold text-xl text-center text-blue-900">
-                        ${dateLabel} ${gameName ? `｜ ${gameName}` : ''} ｜ 地點：${locName}
+                        ${dateLabel} ${gameName ? `｜ ${gameName}` : ''} ｜ 地點：${locDisplay}
                     </div>
                     <div class="overflow-x-auto">
                         <table class="w-full text-md bg-white text-center my-table">
