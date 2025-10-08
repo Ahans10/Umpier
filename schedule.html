@@ -1635,76 +1635,94 @@
             el.games.addEventListener('change', () => loadTeamsByGame(el.games.value));
 
             el.form.addEventListener('submit', async (e) => {
-                e.preventDefault();
+            e.preventDefault();
 
-                const payload = {
-                    games_id: el.games.value || null,
-                    match_dates_id: el.date.value || null,
-                    locations_id: el.loc.value || null,
-                    session: (el.session.value || '').trim(),
-                    time: el.time.value || null,
-                    teams_id1: el.team1.value || null,
-                    teams_id2: el.team2.value || null,
-                    home_id: null, base1_id: null, base2_id: null, base3_id: null,
-                    recorder_id: null, supervisor_id: null,
-                    remark: null,
-                    upload: false
+            const base = {
+                games_id: el.games.value || null,
+                match_dates_id: el.date.value || null,
+                locations_id: el.loc.value || null,
+                session: (el.session.value || '').trim(),
+                time: el.time.value || null,
+                teams_id1: el.team1.value || null,
+                teams_id2: el.team2.value || null,
+            };
+
+            if (!base.games_id) return alert('請選擇賽事');
+            if (!base.match_dates_id) return alert('請選擇日期');
+            if (!base.locations_id) return alert('請選擇地點');
+            if (!base.session) return alert('請輸入場次編號');
+            if (!base.time) return alert('請選擇時間');
+            if (!base.teams_id1 || !base.teams_id2) return alert('請選擇先攻與後攻隊伍');
+            if (base.teams_id1 === base.teams_id2) return alert('先攻與後攻隊伍不可相同');
+
+            const { data: chkTeams, error: chkErr } = await supabase
+                .from('teams')
+                .select('id, games_id')
+                .in('id', [base.teams_id1, base.teams_id2]);
+
+            if (chkErr) { console.error(chkErr); return alert('驗證隊伍所屬賽事失敗，請稍後再試'); }
+            const ok = Array.isArray(chkTeams) && chkTeams.length === 2 &&
+                chkTeams.every(t => String(t.games_id) === String(base.games_id));
+            if (!ok) return alert('所選隊伍不屬於同一賽事，請重新選擇');
+
+            if (currentEditId) {
+                const patch = {
+                    games_id: base.games_id,
+                    match_dates_id: base.match_dates_id,
+                    locations_id: base.locations_id,
+                    session: base.session,
+                    time: base.time,
+                    teams_id1: base.teams_id1,
+                    teams_id2: base.teams_id2,
                 };
 
-                if (!payload.games_id) return alert('請選擇賽事');
-                if (!payload.match_dates_id) return alert('請選擇日期');
-                if (!payload.locations_id) return alert('請選擇地點');
-                if (!payload.session) return alert('請輸入場次編號');
-                if (!payload.time) return alert('請選擇時間');
-                if (!payload.teams_id1 || !payload.teams_id2) return alert('請選擇先攻與後攻隊伍');
-                if (payload.teams_id1 === payload.teams_id2) return alert('先攻與後攻隊伍不可相同');
+                const { error: updErr } = await supabase
+                    .from('matches')
+                    .update(patch)
+                    .eq('id', currentEditId);
 
-                const { data: chkTeams, error: chkErr } = await supabase
-                    .from('teams')
-                    .select('id, games_id')
-                    .in('id', [payload.teams_id1, payload.teams_id2]);
-
-                if (chkErr) { console.error(chkErr); return alert('驗證隊伍所屬賽事失敗，請稍後再試'); }
-                const ok = Array.isArray(chkTeams) && chkTeams.length === 2 &&
-                    chkTeams.every(t => String(t.games_id) === String(payload.games_id));
-                if (!ok) return alert('所選隊伍不屬於同一賽事，請重新選擇');
-
-                if (currentEditId) {
-                    const { error: updErr } = await supabase
-                        .from('matches')
-                        .update(payload)
-                        .eq('id', currentEditId);
-
-                    if (updErr) {
-                        console.error(updErr);
-                        alert('更新失敗，請稍後再試');
-                    } else {
-                        alert('更新成功！');
-                        exitEditMode();
-                        if (el.qGame.value && el.qLoc.value) el.btnQuery.click();
-                    }
+                if (updErr) {
+                    console.error(updErr);
+                    alert('更新失敗，請稍後再試');
                 } else {
-                    const { error: insErr } = await supabase.from('matches').insert(payload);
-                    if (insErr) {
-                        console.error(insErr);
-                        alert('新增賽程失敗，請稍後再試');
-                    } else {
-                        alert('賽程新增成功！');
-
-                        saveMatchDefaults({
-                            games_id: el.games.value,
-                            match_dates_id: el.date.value,
-                            locations_id: el.loc.value,
-                        });
-
-                        el.session.value = '';
-                        el.time.value = '';
-                        el.team1.value = '';
-                        el.team2.value = '';
-                        el.session.focus();
-                    }
+                    alert('更新成功！');
+                    exitEditMode();
+                    if (el.qGame.value && el.qLoc.value) el.btnQuery.click();
                 }
-            });
+            } else {
+                const payloadInsert = {
+                    ...base,
+                    home_id: null,
+                    base1_id: null,
+                    base2_id: null,
+                    base3_id: null,
+                    recorder_id: null,
+                    supervisor_id: null,
+                    remark: null,
+                    upload: false,
+                };
+
+                const { error: insErr } = await supabase.from('matches').insert(payloadInsert);
+                if (insErr) {
+                    console.error(insErr);
+                    alert('新增賽程失敗，請稍後再試');
+                } else {
+                    alert('賽程新增成功！');
+
+                    saveMatchDefaults({
+                        games_id: el.games.value,
+                        match_dates_id: el.date.value,
+                        locations_id: el.loc.value,
+                    });
+
+                    el.session.value = '';
+                    el.time.value = '';
+                    el.team1.value = '';
+                    el.team2.value = '';
+                    el.session.focus();
+                }
+            }
+        });
 
             el.btnQuery.addEventListener('click', async () => {
                 const gameId = el.qGame.value;
