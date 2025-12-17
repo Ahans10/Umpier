@@ -1339,97 +1339,97 @@
 
     document.getElementById('btn-add-match-date').addEventListener('click', async () => {
             contentArea.innerHTML = `
-                <h2 class="text-2xl font-bold mb-6 text-center">新增賽程</h2>
+                                    <h2 class="text-2xl font-bold mb-6 text-center">新增賽程</h2>
 
-                <form id="match-form" class="space-y-6">
-                <!-- 賽事 -->
-                <div>
-                    <label class="block font-semibold mb-2">賽事名稱</label>
-                    <select id="games-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                    <option value="">載入中...</option>
-                    </select>
-                </div>
+                                    <form id="match-form" class="space-y-6">
+                                    <!-- 賽事 -->
+                                    <div>
+                                        <label class="block font-semibold mb-2">賽事名稱</label>
+                                        <select id="games-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                        <option value="">載入中...</option>
+                                        </select>
+                                    </div>
 
-                <!-- 日期、地點 -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                    <label class="block font-semibold mb-2">日期</label>
-                    <select id="date-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                        <option value="">載入中...</option>
-                    </select>
-                    </div>
-                    <div>
-                    <label class="block font-semibold mb-2">地點</label>
-                    <select id="loc-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                        <option value="">載入中...</option>
-                    </select>
-                    </div>
-                </div>
+                                    <!-- 日期、地點 -->
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                        <label class="block font-semibold mb-2">日期</label>
+                                        <select id="date-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                            <option value="">載入中...</option>
+                                        </select>
+                                        </div>
+                                        <div>
+                                        <label class="block font-semibold mb-2">地點</label>
+                                        <select id="loc-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                            <option value="">載入中...</option>
+                                        </select>
+                                        </div>
+                                    </div>
 
-                <!-- 編號、時間 -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                    <label class="block font-semibold mb-2">編號（場次）</label>
-                    <input id="session-input" type="text" placeholder="例：A1 或 1"
-                            class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
-                    </div>
-                    <div>
-                    <label class="block font-semibold mb-2">時間</label>
-                    <input id="time-input" type="time"
-                            class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
-                    </div>
-                </div>
+                                    <!-- 編號、時間 -->
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                        <label class="block font-semibold mb-2">編號（場次）</label>
+                                        <input id="session-input" type="text" placeholder="例：A1 或 1"
+                                                class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                                        </div>
+                                        <div>
+                                        <label class="block font-semibold mb-2">時間</label>
+                                        <input id="time-input" type="time"
+                                                class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                                        </div>
+                                    </div>
 
-                <!-- 先攻 / 後攻 -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                    <label class="block font-semibold mb-2">先攻隊伍</label>
-                    <select id="team1-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                        <option value="">請先選擇賽事</option>
-                    </select>
-                    </div>
-                    <div>
-                    <label class="block font-semibold mb-2">後攻隊伍</label>
-                    <select id="team2-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                        <option value="">請先選擇賽事</option>
-                    </select>
-                    </div>
-                </div>
+                                    <!-- 先攻 / 後攻（允許空白） -->
+                                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div>
+                                        <label class="block font-semibold mb-2">先攻隊伍（可空白）</label>
+                                        <select id="team1-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                            <option value="">請先選擇賽事</option>
+                                        </select>
+                                        </div>
+                                        <div>
+                                        <label class="block font-semibold mb-2">後攻隊伍（可空白）</label>
+                                        <select id="team2-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                            <option value="">請先選擇賽事</option>
+                                        </select>
+                                        </div>
+                                    </div>
 
-                <div class="flex justify-end gap-3">
-                    <button type="submit"
-                            class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                    新增賽程
-                    </button>
-                </div>
-                </form>
+                                    <div class="flex justify-end gap-3">
+                                        <button type="submit"
+                                                class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                                        新增賽程
+                                        </button>
+                                    </div>
+                                    </form>
 
-                <!-- 搜尋區塊 -->
-                <div class="mt-10 pt-6 border-t border-blue-200">
-                <h3 class="text-xl font-bold mb-4">查詢賽程</h3>
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
-                    <div>
-                    <label class="block font-semibold mb-2">賽事</label>
-                    <select id="q-game" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                        <option value="">載入中...</option>
-                    </select>
-                    </div>
-                    <div>
-                    <label class="block font-semibold mb-2">地點</label>
-                    <select id="q-loc" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                        <option value="">載入中...</option>
-                    </select>
-                    </div>
-                    <div class="flex sm:block">
-                    <button id="btn-query" class="w-full px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">查詢</button>
-                    </div>
-                </div>
-                <div id="search-tip" class="text-sm text-blue-700 mt-2"></div>
-                <div id="search-result" class="mt-6 space-y-8"></div>
-                </div>
+                                    <!-- 搜尋區塊 -->
+                                    <div class="mt-10 pt-6 border-t border-blue-200">
+                                    <h3 class="text-xl font-bold mb-4">查詢賽程</h3>
+                                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end">
+                                        <div>
+                                        <label class="block font-semibold mb-2">賽事</label>
+                                        <select id="q-game" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                            <option value="">載入中...</option>
+                                        </select>
+                                        </div>
+                                        <div>
+                                        <label class="block font-semibold mb-2">地點</label>
+                                        <select id="q-loc" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                            <option value="">載入中...</option>
+                                        </select>
+                                        </div>
+                                        <div class="flex sm:block">
+                                        <button id="btn-query" class="w-full px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">查詢</button>
+                                        </div>
+                                    </div>
+                                    <div id="search-tip" class="text-sm text-blue-700 mt-2"></div>
+                                    <div id="search-result" class="mt-6 space-y-8"></div>
+                                    </div>
 
-                <div id="match-tip" class="text-sm text-blue-700 mt-2"></div>
-            `;
+                                    <div id="match-tip" class="text-sm text-blue-700 mt-2"></div>
+                                `;
 
             const el = {
                 form: document.getElementById('match-form'),
@@ -1593,7 +1593,7 @@
                     return;
                 }
 
-                const options = `<option value="">請選擇隊伍</option>` +
+                const options = `<option value="">（可留空）</option>` +
                     (data || []).map(t => `<option value="${t.id}">${t.name}</option>`).join('');
                 el.team1.innerHTML = options;
                 el.team2.innerHTML = options;
@@ -1635,94 +1635,106 @@
             el.games.addEventListener('change', () => loadTeamsByGame(el.games.value));
 
             el.form.addEventListener('submit', async (e) => {
-            e.preventDefault();
+                e.preventDefault();
 
-            const base = {
-                games_id: el.games.value || null,
-                match_dates_id: el.date.value || null,
-                locations_id: el.loc.value || null,
-                session: (el.session.value || '').trim(),
-                time: el.time.value || null,
-                teams_id1: el.team1.value || null,
-                teams_id2: el.team2.value || null,
-            };
-
-            if (!base.games_id) return alert('請選擇賽事');
-            if (!base.match_dates_id) return alert('請選擇日期');
-            if (!base.locations_id) return alert('請選擇地點');
-            if (!base.session) return alert('請輸入場次編號');
-            if (!base.time) return alert('請選擇時間');
-            if (!base.teams_id1 || !base.teams_id2) return alert('請選擇先攻與後攻隊伍');
-            if (base.teams_id1 === base.teams_id2) return alert('先攻與後攻隊伍不可相同');
-
-            const { data: chkTeams, error: chkErr } = await supabase
-                .from('teams')
-                .select('id, games_id')
-                .in('id', [base.teams_id1, base.teams_id2]);
-
-            if (chkErr) { console.error(chkErr); return alert('驗證隊伍所屬賽事失敗，請稍後再試'); }
-            const ok = Array.isArray(chkTeams) && chkTeams.length === 2 &&
-                chkTeams.every(t => String(t.games_id) === String(base.games_id));
-            if (!ok) return alert('所選隊伍不屬於同一賽事，請重新選擇');
-
-            if (currentEditId) {
-                const patch = {
-                    games_id: base.games_id,
-                    match_dates_id: base.match_dates_id,
-                    locations_id: base.locations_id,
-                    session: base.session,
-                    time: base.time,
-                    teams_id1: base.teams_id1,
-                    teams_id2: base.teams_id2,
+                const base = {
+                    games_id: el.games.value || null,
+                    match_dates_id: el.date.value || null,
+                    locations_id: el.loc.value || null,
+                    session: (el.session.value || '').trim(),
+                    time: el.time.value || null,
+                    teams_id1: el.team1.value || null,
+                    teams_id2: el.team2.value || null,
                 };
 
-                const { error: updErr } = await supabase
-                    .from('matches')
-                    .update(patch)
-                    .eq('id', currentEditId);
+                if (!base.games_id) return alert('請選擇賽事');
+                if (!base.match_dates_id) return alert('請選擇日期');
+                if (!base.locations_id) return alert('請選擇地點');
+                if (!base.session) return alert('請輸入場次編號');
+                if (!base.time) return alert('請選擇時間');
 
-                if (updErr) {
-                    console.error(updErr);
-                    alert('更新失敗，請稍後再試');
-                } else {
-                    alert('更新成功！');
-                    exitEditMode();
-                    if (el.qGame.value && el.qLoc.value) el.btnQuery.click();
+                if (base.teams_id1 && base.teams_id2 && base.teams_id1 === base.teams_id2) {
+                    return alert('先攻與後攻隊伍不可相同');
                 }
-            } else {
-                const payloadInsert = {
-                    ...base,
-                    home_id: null,
-                    base1_id: null,
-                    base2_id: null,
-                    base3_id: null,
-                    recorder_id: null,
-                    supervisor_id: null,
-                    remark: null,
-                    upload: false,
-                };
 
-                const { error: insErr } = await supabase.from('matches').insert(payloadInsert);
-                if (insErr) {
-                    console.error(insErr);
-                    alert('新增賽程失敗，請稍後再試');
-                } else {
-                    alert('賽程新增成功！');
+                const filledTeamIds = [base.teams_id1, base.teams_id2].filter(Boolean);
+                if (filledTeamIds.length > 0) {
+                    const { data: chkTeams, error: chkErr } = await supabase
+                        .from('teams')
+                        .select('id, games_id')
+                        .in('id', filledTeamIds);
 
-                    saveMatchDefaults({
-                        games_id: el.games.value,
-                        match_dates_id: el.date.value,
-                        locations_id: el.loc.value,
-                    });
+                    if (chkErr) {
+                        console.error(chkErr);
+                        return alert('驗證隊伍所屬賽事失敗，請稍後再試');
+                    }
 
-                    el.session.value = '';
-                    el.time.value = '';
-                    el.team1.value = '';
-                    el.team2.value = '';
-                    el.session.focus();
+                    if (!Array.isArray(chkTeams) || chkTeams.length !== filledTeamIds.length) {
+                        return alert('隊伍清單驗證失敗，請重新選擇隊伍');
+                    }
+
+                    const allMatchGame = chkTeams.every(t => String(t.games_id) === String(base.games_id));
+                    if (!allMatchGame) return alert('所選隊伍不屬於此賽事，請重新選擇');
                 }
-            }
-        });
+
+                if (currentEditId) {
+                    const patch = {
+                        games_id: base.games_id,
+                        match_dates_id: base.match_dates_id,
+                        locations_id: base.locations_id,
+                        session: base.session,
+                        time: base.time,
+                        teams_id1: base.teams_id1,
+                        teams_id2: base.teams_id2,
+                    };
+
+                    const { error: updErr } = await supabase
+                        .from('matches')
+                        .update(patch)
+                        .eq('id', currentEditId);
+
+                    if (updErr) {
+                        console.error(updErr);
+                        alert('更新失敗，請稍後再試');
+                    } else {
+                        alert('更新成功！');
+                        exitEditMode();
+                        if (el.qGame.value && el.qLoc.value) el.btnQuery.click();
+                    }
+                } else {
+                    const payloadInsert = {
+                        ...base,
+                        home_id: null,
+                        base1_id: null,
+                        base2_id: null,
+                        base3_id: null,
+                        recorder_id: null,
+                        supervisor_id: null,
+                        remark: null,
+                        upload: false,
+                    };
+
+                    const { error: insErr } = await supabase.from('matches').insert(payloadInsert);
+                    if (insErr) {
+                        console.error(insErr);
+                        alert('新增賽程失敗，請稍後再試');
+                    } else {
+                        alert('賽程新增成功！');
+
+                        saveMatchDefaults({
+                            games_id: el.games.value,
+                            match_dates_id: el.date.value,
+                            locations_id: el.loc.value,
+                        });
+
+                        el.session.value = '';
+                        el.time.value = '';
+                        el.team1.value = '';
+                        el.team2.value = '';
+                        el.session.focus();
+                    }
+                }
+            });
 
             el.btnQuery.addEventListener('click', async () => {
                 const gameId = el.qGame.value;
@@ -1799,56 +1811,56 @@
                                             對戰：${t1} vs ${t2}
                                             此操作無法復原。`;
                         return `
-                            <tr data-id="${r.id}">
-                                <td class="border px-3 py-2 text-center">${session}</td>
-                                <td class="border px-3 py-2 text-center whitespace-nowrap">${time}</td>
-                                <td class="border px-3 py-2 text-center">${t1}</td>
-                                <td class="border px-3 py-2 text-center">vs</td>
-                                <td class="border px-3 py-2 text-center">${t2}</td>
-                                <td class="border px-3 py-2 text-center">
-                                <button
-                                    class="btn-edit-match inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                    title="修改"
-                                    data-id="${r.id}">
-                                    <i class="fas fa-edit"></i>
-                                </button>
-                                <button
-                                    class="btn-del-match inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
-                                    title="刪除"
-                                    data-id="${r.id}"
-                                    data-confirm="${confirmText.replace(/"/g, '&quot;')}"
-                                >
-                                    <i class="fas fa-trash-alt"></i>
-                                </button>
-                                </td>
-                            </tr>
-                            `;
+                        <tr data-id="${r.id}">
+                            <td class="border px-3 py-2 text-center">${session}</td>
+                            <td class="border px-3 py-2 text-center whitespace-nowrap">${time}</td>
+                            <td class="border px-3 py-2 text-center">${t1}</td>
+                            <td class="border px-3 py-2 text-center">vs</td>
+                            <td class="border px-3 py-2 text-center">${t2}</td>
+                            <td class="border px-3 py-2 text-center">
+                            <button
+                                class="btn-edit-match inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                title="修改"
+                                data-id="${r.id}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <button
+                                class="btn-del-match inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
+                                title="刪除"
+                                data-id="${r.id}"
+                                data-confirm="${confirmText.replace(/"/g, '&quot;')}"
+                            >
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
+                            </td>
+                        </tr>
+                        `;
                     }).join('');
 
                     return `
-                        <div class="rounded-xl border border-blue-300 overflow-hidden">
-                        <div class="bg-blue-50 px-4 py-3 font-semibold text-center">
-                            ${dLabel} ｜ ${gameName} ｜ 地點：${locName}
-                        </div>
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-sm bg-white text-center">
-                            <thead class="bg-blue-100 text-blue-800">
-                                <tr>
-                                <th class="border px-3 py-2 text-center">場次</th>
-                                <th class="border px-3 py-2 text-center">時間</th>
-                                <th class="border px-3 py-2 text-center">先攻</th>
-                                <th class="border px-3 py-2 text-center">VS</th>
-                                <th class="border px-3 py-2 text-center">後攻</th>
-                                <th class="border px-3 py-2 text-center">操作</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${rowsHtml}
-                            </tbody>
-                            </table>
-                        </div>
-                        </div>
-                    `;
+                    <div class="rounded-xl border border-blue-300 overflow-hidden">
+                    <div class="bg-blue-50 px-4 py-3 font-semibold text-center">
+                        ${dLabel} ｜ ${gameName} ｜ 地點：${locName}
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm bg-white text-center">
+                        <thead class="bg-blue-100 text-blue-800">
+                            <tr>
+                            <th class="border px-3 py-2 text-center">場次</th>
+                            <th class="border px-3 py-2 text-center">時間</th>
+                            <th class="border px-3 py-2 text-center">先攻</th>
+                            <th class="border px-3 py-2 text-center">VS</th>
+                            <th class="border px-3 py-2 text-center">後攻</th>
+                            <th class="border px-3 py-2 text-center">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rowsHtml}
+                        </tbody>
+                        </table>
+                    </div>
+                    </div>
+                `;
                 }).join('');
 
                 el.searchResult.querySelectorAll('.btn-del-match').forEach(btn => {
