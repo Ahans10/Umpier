@@ -53,9 +53,7 @@
                         <option value="">載入中...</option>
                     </select>
                 </div>
-                <div id="date-options" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-blue-800 text-lg">
-                    <!-- 比賽日期將在這裡顯示 -->
-                </div>
+                <div id="date-options" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-blue-800 text-lg"></div>
                 <div class="text-center mt-6">
                     <button type="submit"
                         class="px-6 py-2 bg-blue-600 text-white rounded-xl font-semibold hover:bg-blue-700 transition">
@@ -79,36 +77,35 @@
             </small>
         </div>
     </div>
-</body>
-<script>
-    const supabaseUrl = 'https://qfupnebeqjzhqplqkuqz.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmdXBuZWJlcWp6aHFwbHFrdXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0OTgzNzksImV4cCI6MjA2NjA3NDM3OX0.NUeJJ9liEi1Ckx9BrCTIr5ibZqkPaxQYLVC7-VvbzvA';
-    const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseKey) : window.Supabase.createClient(supabaseUrl, supabaseKey);
 
-    const profileStr = localStorage.getItem('profile');
-    if (profileStr) {
-        const profile = JSON.parse(profileStr);
-        const roleText = profile.role === 'admin' ? '管理員'
-            : profile.role === 'member' ? '裁判員' : '（未知身份）';
+    <script>
+        const supabaseUrl = 'https://qfupnebeqjzhqplqkuqz.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmdXBuZWJlcWp6aHFwbHFrdXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0OTgzNzksImV4cCI6MjA2NjA3NDM3OX0.NUeJJ9liEi1Ckx9BrCTIr5ibZqkPaxQYLVC7-VvbzvA';
+        const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseKey) : window.Supabase.createClient(supabaseUrl, supabaseKey);
 
-        document.getElementById('welcome-title').innerText = `${profile.name || ''} 您好 !`;
-        document.getElementById('profile-info').innerHTML = `
-            <div>${roleText}</div>
-        `;
-    }
+        const profileStr = localStorage.getItem('profile');
+        if (profileStr) {
+            const profile = JSON.parse(profileStr);
+            const roleText = profile.role === 'admin' ? '管理員' : profile.role === 'member' ? '裁判員' : '（未知身份）';
+            document.getElementById('welcome-title').innerText = `${profile.name || ''} 您好 !`;
+            document.getElementById('profile-info').innerHTML = `<div>${roleText}</div>`;
+        }
 
         let __ALL_DATES = [];
         let __REGISTERED = [];
         let __NOTE_MAP = {};
         let __CURRENT_MONTH_KEY = "";
         let __CURRENT_MONTH_DATE_IDS = [];
+        let __IS_ADMIN = false;
 
         async function loadMatchDates(keepMonthKey) {
             const profileStr = localStorage.getItem('profile');
             if (!profileStr) { alert('尚未登入'); return; }
             const profile = JSON.parse(profileStr);
             const userId = profile.id;
+            __IS_ADMIN = (profile.role === 'admin');
 
+            // 讀取目前使用者在各日期的報名與備註
             const { data: registered, error: regError } = await supabase
                 .from('registrations')
                 .select('match_date_id, description')
@@ -119,10 +116,15 @@
             __NOTE_MAP = {};
             __REGISTERED.forEach(r => { __NOTE_MAP[r.match_date_id] = r.description || ''; });
 
-            const { data, error } = await supabase
+            // ⭐ 關鍵修改：管理員看全部；會員只看 is_public=true
+            let q = supabase
                 .from('match_dates')
-                .select('id, date')
+                .select('id, date, is_public')
                 .order('date');
+            if (!__IS_ADMIN) {
+                q = q.eq('is_public', true);
+            }
+            const { data, error } = await q;
             if (error) { console.error('❌ 載入比賽日期失敗：', error); return; }
 
             __ALL_DATES = data || [];
@@ -175,23 +177,32 @@
                 });
                 const isChecked = registeredIds.has(String(d.id)) ? 'checked' : '';
                 const note = __NOTE_MAP[d.id] || '';
+
+                // 管理員才看到的不公開標籤
+                const privateBadge = (__IS_ADMIN && d.is_public === false)
+                    ? `<span class="ml-2 inline-flex items-center rounded-md bg-red-100 text-red-700 text-xs font-semibold px-2 py-0.5">
+           <i class="fa-solid fa-lock mr-1"></i> 不公開
+         </span>`
+                    : '';
+
                 return `
-                <div class="flex flex-col gap-2 p-4 bg-blue-50 rounded-xl shadow-sm hover:bg-blue-100 transition">
-                <label class="flex items-center space-x-4 cursor-pointer">
-                    <input type="checkbox" name="dates" value="${d.id}" ${isChecked}
-                        class="accent-blue-600 w-6 h-6 shrink-0" />
-                    <span class="text-xl sm:text-2xl font-semibold">${dateText}</span>
-                </label>
-                <input type="text" name="note-${d.id}" placeholder="備註（可不填）"
-                        value="${note.replace(/"/g, '&quot;')}"
-                        class="w-full px-3 py-2 rounded-md border border-blue-300 text-base text-blue-800 bg-white" />
-                </div>`;
+      <div class="flex flex-col gap-2 p-4 bg-blue-50 rounded-xl shadow-sm hover:bg-blue-100 transition">
+        <label class="flex items-center space-x-4 cursor-pointer">
+          <input type="checkbox" name="dates" value="${d.id}" ${isChecked}
+            class="accent-blue-600 w-6 h-6 shrink-0" />
+          <span class="text-xl sm:text-2xl font-semibold">
+            ${dateText}${privateBadge}
+          </span>
+        </label>
+        <input type="text" name="note-${d.id}" placeholder="備註（可不填）"
+          value="${note.replace(/"/g, '&quot;')}"
+          class="w-full px-3 py-2 rounded-md border border-blue-300 text-base text-blue-800 bg-white" />
+      </div>`;
             }).join('');
         }
 
         document.getElementById('register-form').addEventListener('submit', async function (e) {
             e.preventDefault();
-
             const keepYM = __CURRENT_MONTH_KEY;
 
             const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
@@ -246,10 +257,11 @@
             loadMatchDates();
         });
 
-    document.getElementById('logout-btn').addEventListener('click', function () {
-        localStorage.removeItem('profile');
-        window.location.href = 'index.html';
-    });
-</script>
+        document.getElementById('logout-btn').addEventListener('click', function () {
+            localStorage.removeItem('profile');
+            window.location.href = 'index.html';
+        });
+    </script>
+</body>
 
 </html>
