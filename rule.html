@@ -153,62 +153,59 @@
                     return;
                 }
 
-                const list = (data || []).slice().sort((a, b) => {
-                    const ap = !!a.rules_pinned, bp = !!b.rules_pinned;
-                    if (ap !== bp) return bp - ap;
-                    const ah = !!a.rules_url, bh = !!b.rules_url;
-                    if (ah !== bh) return bh - ah;
-                    if (ah && bh) {
-                        const at = a.rules_updated_at ? +new Date(a.rules_updated_at) : 0;
-                        const bt = b.rules_updated_at ? +new Date(b.rules_updated_at) : 0;
-                        if (at !== bt) return bt - at;
-                    }
-                    return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
-                });
+                const all = data || [];
 
                 if (currentProfile?.role === 'admin') {
                     gameSelect.innerHTML =
-                        `<option value="">請選擇項目</option>` +
-                        list.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                        `<option value="">請選擇賽事</option>` +
+                        all.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
                 }
 
-                if (list.length === 0) {
-                    rulesList.innerHTML = `<div class="text-blue-800 text-center">目前無賽事</div>`;
+                const withFile = all.filter(g => !!g.rules_url);
+
+                if (withFile.length === 0) {
+                    rulesList.innerHTML = `<div class="text-blue-800 text-center">目前沒有已上傳的競賽規則</div>`;
                     return;
                 }
 
-                rulesList.innerHTML = list.map(g => {
-                    const has = !!g.rules_url;
-                    const updated = fmtTs(g.rules_updated_at);
-                    const previewUrl = has ? buildPreviewUrl(g.rules_url) : '';
-                    const downloadUrl = has ? buildDownloadUrl(g.rules_url, `${g.name || 'rules'}.pdf`) : '';
+                withFile.sort((a, b) => {
+                    const ap = !!a.rules_pinned, bp = !!b.rules_pinned;
+                    if (ap !== bp) return bp - ap;
+                    const at = a.rules_updated_at ? +new Date(a.rules_updated_at) : 0;
+                    const bt = b.rules_updated_at ? +new Date(b.rules_updated_at) : 0;
+                    if (at !== bt) return bt - at;
+                    return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
+                });
 
+                rulesList.innerHTML = withFile.map(g => {
+                    const updated = fmtTs(g.rules_updated_at);
+                    const previewUrl = buildPreviewUrl(g.rules_url);
+                    const downloadUrl = buildDownloadUrl(g.rules_url, `${g.name || 'rules'}.pdf`);
                     const pinBadge = g.rules_pinned
                         ? `<span class="ml-2 inline-block text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 align-middle">置頂</span>`
                         : '';
 
                     const pinBtn = currentProfile?.role === 'admin'
                         ? `<button data-id="${g.id}" data-pinned="${g.rules_pinned ? '1' : '0'}"
-                                    class="btn-toggle-pin px-3 py-2 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50">
-                            ${g.rules_pinned ? '取消置頂' : '置頂'}
-                            </button>`
-                                            : '';
+                                class="btn-toggle-pin px-3 py-2 rounded-lg border border-amber-300 text-amber-700 hover:bg-amber-50">
+                        ${g.rules_pinned ? '取消置頂' : '置頂'}
+                        </button>`
+                        : '';
 
-                                        return `
+                    return `
                         <div class="border border-blue-200 rounded-xl p-4 bg-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                             <div>
                             <div class="font-semibold text-lg">${g.name}${pinBadge}</div>
-                            <div class="text-sm text-slate-600">最後更新：${has ? updated : '—'}</div>
+                            <div class="text-sm text-slate-600">最後更新：${updated}</div>
                             </div>
                             <div class="flex gap-2 flex-wrap justify-end">
                             ${pinBtn}
-                            <a ${has ? `href="${previewUrl}" target="_blank" rel="noopener"` : 'href="javascript:;"'}
-                                class="px-4 py-2 rounded-lg ${has ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}">
+                            <a href="${previewUrl}" target="_blank" rel="noopener"
+                                class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700">
                                 查看
                             </a>
-                            <a ${has ? `href="${downloadUrl}"` : 'href="javascript:;"'}
-                                ${has ? `download="${(g.name || 'rules')}.pdf"` : ''}
-                                class="px-4 py-2 rounded-lg ${has ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}">
+                            <a href="${downloadUrl}" download="${(g.name || 'rules')}.pdf"
+                                class="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700">
                                 下載
                             </a>
                             </div>
@@ -225,10 +222,7 @@
                                 .from('games')
                                 .update({ rules_pinned: !pinned })
                                 .eq('id', id);
-                            if (uerr) {
-                                alert('更新置頂狀態失敗：' + uerr.message);
-                                return;
-                            }
+                            if (uerr) return alert('更新置頂狀態失敗：' + uerr.message);
                             loadGames();
                         });
                     });
