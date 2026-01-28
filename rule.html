@@ -2,8 +2,8 @@
 <html lang="zh-Hant">
 
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>競賽規則 | 裁判出勤系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -23,13 +23,11 @@
             <div class="flex w-full sm:w-1/4 justify-center sm:justify-end pr-0 sm:pr-6">
                 <i class="fas fa-user text-blue-500 text-6xl drop-shadow-sm"></i>
             </div>
-
             <div
                 class="flex flex-col justify-center sm:items-start items-center sm:w-2/4 text-blue-900 text-center sm:text-left">
                 <div id="profile-info" class="text-xl font-bold leading-snug text-blue-800"></div>
                 <h2 id="welcome-title" class="text-2xl sm:text-3xl font-bold mb-1">您好!</h2>
             </div>
-
             <div class="flex flex-col sm:w-1/4 w-full items-center gap-3">
                 <a href="change_password.html" id="change-pwd-btn"
                     class="w-full px-5 py-2 rounded-xl bg-white border-2 border-blue-400 text-blue-800 font-semibold hover:bg-blue-100 transition shadow-sm text-center">
@@ -43,12 +41,39 @@
         </div>
 
         <div
-            class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-xl mx-auto text-center space-y-6">
-            <h1
-                class="text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-blue-400 drop-shadow-md animate-pulse">
-                敬請期待</h1>
+            class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-8 w-full max-w-3xl mx-auto">
+            <h2 class="text-2xl font-bold mb-6 text-center">競賽規則</h2>
 
-            <div class="flex justify-center mt-4" id="back-button">
+            <!-- 管理員上傳區 -->
+            <div id="admin-uploader" class="hidden mb-8">
+                <div class="rounded-xl border border-blue-200 bg-blue-50 p-4">
+                    <h3 class="font-semibold mb-3">上傳 / 替換規則 PDF</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">賽事</label>
+                            <select id="game-select" class="w-full border rounded-lg px-3 py-2 bg-white text-blue-900">
+                                <option value="">載入中...</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-semibold mb-1">選擇 PDF</label>
+                            <input id="file-input" type="file" accept="application/pdf"
+                                class="w-full border rounded-lg px-3 py-2 bg-white text-blue-900" />
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="btn-upload"
+                                class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">上傳/更新</button>
+                            <button id="btn-delete"
+                                class="w-full px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">刪除規則</button>
+                        </div>
+                    </div>
+                    <div id="admin-tip" class="text-sm text-blue-700 mt-2"></div>
+                </div>
+            </div>
+
+            <div id="rules-list" class="space-y-4"></div>
+
+            <div class="flex justify-center mt-6">
                 <a href="main.html"
                     class="text-center py-2 px-6 rounded-xl border-2 border-blue-600 text-blue-900 font-semibold hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-500 hover:text-white transition">
                     <i class="fas fa-arrow-left me-2"></i>返回首頁
@@ -63,29 +88,182 @@
             </small>
         </div>
     </div>
+
+    <script>
+        const supabaseUrl = 'https://qfupnebeqjzhqplqkuqz.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmdXBuZWJlcWp6aHFwbHFrdXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0OTgzNzksImV4cCI6MjA2NjA3NDM3OX0.NUeJJ9liEi1Ckx9BrCTIr5ibZqkPaxQYLVC7-VvbzvA';
+        const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseKey)
+            : window.Supabase.createClient(supabaseUrl, supabaseKey);
+
+        const profileStr = localStorage.getItem('profile');
+        let currentProfile = null;
+        if (profileStr) {
+            currentProfile = JSON.parse(profileStr);
+            const roleText = currentProfile.role === 'admin' ? '管理員'
+                : currentProfile.role === 'member' ? '裁判員' : '（未知身份）';
+            document.getElementById('welcome-title').innerText = `${currentProfile.name || ''} 您好 !`;
+            document.getElementById('profile-info').innerHTML = `<div>${roleText}</div>`;
+            if (currentProfile.role === 'admin') document.getElementById('admin-uploader').classList.remove('hidden');
+        }
+
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            localStorage.removeItem('profile');
+            window.location.href = 'index.html';
+        });
+
+        function fmtTs(ts) {
+            if (!ts) return '—';
+            const d = new Date(ts);
+            return d.toLocaleString('zh-TW', {
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', hour12: false
+            }).replace(/\//g, '/');
+        }
+
+        function buildPreviewUrl(rulesUrl) {
+            if (/^https?:\/\//i.test(rulesUrl)) return rulesUrl;
+            return supabase.storage.from('rules').getPublicUrl(rulesUrl).data.publicUrl;
+        }
+
+        function buildDownloadUrl(rulesUrl, filename = 'rules.pdf') {
+            if (/^https?:\/\//i.test(rulesUrl)) {
+                const u = new URL(rulesUrl);
+                u.searchParams.set('download', filename);
+                return u.toString();
+            }
+            return supabase.storage
+                .from('rules')
+                .getPublicUrl(rulesUrl, { download: filename })
+                .data.publicUrl;
+        }
+
+        const rulesList = document.getElementById('rules-list');
+        const adminTip = document.getElementById('admin-tip');
+        const gameSelect = document.getElementById('game-select');
+        const fileInput = document.getElementById('file-input');
+
+        async function loadGames() {
+                const { data, error } = await supabase
+                    .from('games')
+                    .select('id, name, rules_url, rules_updated_at')
+                    .order('name', { ascending: true });
+
+                if (error) {
+                    rulesList.innerHTML = `<div class="text-red-600">載入失敗：${error.message}</div>`;
+                    return;
+                }
+
+                const list = (data || []).slice().sort((a, b) => {
+                    const ah = !!a.rules_url, bh = !!b.rules_url;
+                    if (ah !== bh) return bh - ah;
+                    if (ah && bh) {
+                        const at = a.rules_updated_at ? new Date(a.rules_updated_at).getTime() : 0;
+                        const bt = b.rules_updated_at ? new Date(b.rules_updated_at).getTime() : 0;
+                        if (at !== bt) return bt - at;
+                    }
+                    return (a.name || '').localeCompare(b.name || '', 'zh-Hant');
+                });
+
+                if (currentProfile?.role === 'admin') {
+                    gameSelect.innerHTML =
+                        `<option value="">請選擇賽事</option>` +
+                        list.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+                }
+
+                if (list.length === 0) {
+                    rulesList.innerHTML = `<div class="text-blue-800 text-center">目前無賽事</div>`;
+                    return;
+                }
+
+                rulesList.innerHTML = list.map(g => {
+                    const has = !!g.rules_url;
+                    const updated = fmtTs(g.rules_updated_at);
+                    const previewUrl = has ? buildPreviewUrl(g.rules_url) : '';
+                    const downloadUrl = has ? buildDownloadUrl(g.rules_url, `${g.name || 'rules'}.pdf`) : '';
+
+                    return `
+                        <div class="border border-blue-200 rounded-xl p-4 bg-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                            <div>
+                            <div class="font-semibold text-lg">${g.name}</div>
+                            <div class="text-sm text-slate-600">最後更新：${has ? updated : '—'}</div>
+                            </div>
+                            <div class="flex gap-2">
+                            <a ${has ? `href="${previewUrl}" target="_blank" rel="noopener"` : 'href="javascript:;"'}
+                                class="px-4 py-2 rounded-lg ${has ? 'bg-blue-600 text-white hover:bg-blue-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}">
+                                查看
+                            </a>
+                            <a ${has ? `href="${downloadUrl}"` : 'href="javascript:;"'}
+                                ${has ? `download="${(g.name || 'rules')}.pdf"` : ''}
+                                class="px-4 py-2 rounded-lg ${has ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-slate-300 text-slate-500 cursor-not-allowed'}">
+                                下載
+                            </a>
+                            </div>
+                        </div>
+                        `;
+                }).join('');
+            }
+
+        document.getElementById('btn-upload')?.addEventListener('click', async () => {
+            const gid = gameSelect.value;
+            const f = fileInput.files?.[0];
+            if (!gid) return alert('請先選擇賽事');
+            if (!f) return alert('請選擇 PDF 檔');
+
+            if (f.type !== 'application/pdf') return alert('請上傳 PDF');
+
+            adminTip.textContent = '上傳中...';
+
+            const path = `games/${gid}.pdf`;
+
+            await supabase.storage.from('rules').remove([path]).catch(() => { });
+
+            const { error: upErr } = await supabase.storage.from('rules').upload(path, f, {
+                cacheControl: '3600',
+                upsert: true,
+                contentType: 'application/pdf'
+            });
+            if (upErr) {
+                adminTip.textContent = '';
+                return alert('上傳失敗：' + upErr.message);
+            }
+
+            const { error: updErr } = await supabase
+                .from('games')
+                .update({ rules_url: path, rules_updated_at: new Date().toISOString() })
+                .eq('id', gid);
+
+            adminTip.textContent = '';
+            if (updErr) return alert('更新資料表失敗：' + updErr.message);
+
+            alert('規則已更新！');
+            fileInput.value = '';
+            await loadGames();
+        });
+
+        document.getElementById('btn-delete')?.addEventListener('click', async () => {
+            const gid = gameSelect.value;
+            if (!gid) return alert('請先選擇賽事');
+            if (!confirm('確定要刪除此賽事的規則 PDF？')) return;
+
+            const { data, error } = await supabase
+                .from('games')
+                .select('rules_url')
+                .eq('id', gid)
+                .single();
+            if (error) return alert('讀取失敗：' + error.message);
+
+            if (data?.rules_url) {
+                await supabase.storage.from('rules').remove([data.rules_url]).catch(() => { });
+            }
+            await supabase.from('games').update({ rules_url: null, rules_updated_at: null }).eq('id', gid);
+            alert('已刪除');
+            await loadGames();
+        });
+
+        (async () => {
+            await loadGames();
+        })();
+    </script>
 </body>
-<script>
-    const supabaseUrl = 'https://qfupnebeqjzhqplqkuqz.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmdXBuZWJlcWp6aHFwbHFrdXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0OTgzNzksImV4cCI6MjA2NjA3NDM3OX0.NUeJJ9liEi1Ckx9BrCTIr5ibZqkPaxQYLVC7-VvbzvA';
-    const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseKey) : window.Supabase.createClient(supabaseUrl, supabaseKey);
-
-    const profileStr = localStorage.getItem('profile');
-    if (profileStr) {
-        const profile = JSON.parse(profileStr);
-        const roleText = profile.role === 'admin' ? '管理員'
-            : profile.role === 'member' ? '裁判員' : '（未知身份）';
-
-        document.getElementById('welcome-title').innerText = `${profile.name || ''} 您好 !`;
-        document.getElementById('profile-info').innerHTML = `
-            <div>${roleText}</div>
-        `;
-    }
-
-    document.getElementById('logout-btn').addEventListener('click', function () {
-        localStorage.removeItem('profile');
-        window.location.href = 'index.html';
-    });
-</script>
-
 
 </html>
