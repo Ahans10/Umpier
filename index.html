@@ -116,10 +116,8 @@
                 .maybeSingle();
 
             if (pErr || !profile) {
-                // 若沒有 profile，仍然登入，但先清掉舊資料避免日後顯示錯亂
                 localStorage.removeItem('profile');
                 msgEl.textContent = '登入成功，但查無個人資料，請聯繫管理員建立檔案';
-                // 仍可導到首頁（讓管理員帳看得到管理功能）
                 window.location.href = 'main.html';
                 return;
             }

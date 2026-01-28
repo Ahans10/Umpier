@@ -199,56 +199,136 @@
         }
 
         document.getElementById('register-form').addEventListener('submit', async function (e) {
-            e.preventDefault();
-            const keepYM = __CURRENT_MONTH_KEY;
+                e.preventDefault();
+                const keepYM = __CURRENT_MONTH_KEY;
 
-            const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
-            const selectedDateIds = Array.from(checkboxes).map(cb => cb.value);
+                const profileStr = localStorage.getItem('profile');
+                if (!profileStr) { alert('尚未登入'); return; }
+                const profile = JSON.parse(profileStr);
+                const userId = profile.id;
 
-            const profileStr = localStorage.getItem('profile');
-            if (!profileStr) { alert('尚未登入'); return; }
-            const profile = JSON.parse(profileStr);
-            const userId = profile.id;
+                // 這次使用者勾選的日期
+                const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
+                const selectedIds = new Set(Array.from(checkboxes).map(cb => String(cb.value)));
 
-            if (__CURRENT_MONTH_DATE_IDS.length > 0) {
-                const { error: deleteError } = await supabase
-                    .from('registrations')
-                    .delete()
-                    .eq('user_id', userId)
-                    .in('match_date_id', __CURRENT_MONTH_DATE_IDS);
-                if (deleteError) {
-                    console.error('❌ 刪除舊報名失敗', deleteError);
-                    alert('更新失敗（刪除舊資料失敗）');
-                    return;
+                // 取出「本月」所有日期 id（renderMonth 會更新它）
+                const monthIds = (__CURRENT_MONTH_DATE_IDS || []).map(String);
+                const monthIdSet = new Set(monthIds);
+
+                // 先抓資料庫「本月舊報名」（只抓這個月，避免掃整張表）
+                let existing = [];
+                if (monthIds.length > 0) {
+                    const { data, error } = await supabase
+                        .from('registrations')
+                        .select('id, match_date_id, description, registred_at')
+                        .eq('user_id', userId)
+                        .in('match_date_id', monthIds);
+
+                    if (error) {
+                        console.error('❌ 載入本月舊報名失敗：', error);
+                        alert('更新失敗（讀取舊資料失敗）');
+                        return;
+                    }
+                    existing = data || [];
                 }
-            }
 
-            const insertData = selectedDateIds.map(id => {
-                const noteInput = document.querySelector(`input[name="note-${id}"]`);
-                const note = noteInput ? noteInput.value.trim() : '';
-                return {
-                    user_id: userId,
-                    match_date_id: id,
-                    description: note,
-                    registred_at: new Date().toISOString()
-                };
+                const existingMap = new Map(existing.map(r => [String(r.match_date_id), r])); // key = match_date_id
+
+                // 組合：本次勾選對應的備註（只看本月，避免抓到別月 UI）
+                const selectedWithNotes = [];
+                for (const id of selectedIds) {
+                    // id 一定是 match_date_id
+                    const noteInput = document.querySelector(`input[name="note-${id}"]`);
+                    const note = noteInput ? noteInput.value.trim() : '';
+                    selectedWithNotes.push({ id: String(id), note });
+                }
+
+                // 計算要刪 / 要增 / 要改
+                const toDelete = [];
+                for (const r of existing) {
+                    const id = String(r.match_date_id);
+                    // 安全：只處理本月
+                    if (!monthIdSet.has(id)) continue;
+                    if (!selectedIds.has(id)) {
+                        toDelete.push(id);
+                    }
+                }
+
+                const toInsert = [];
+                const toUpdate = []; // {id, note}
+                for (const { id, note } of selectedWithNotes) {
+                    // 安全：只處理本月
+                    if (!monthIdSet.has(id)) continue;
+
+                    const old = existingMap.get(id);
+                    if (!old) {
+                        // 原本沒有 -> 新增（寫 registred_at）
+                        toInsert.push({
+                            user_id: userId,
+                            match_date_id: id,
+                            description: note,
+                            registred_at: new Date().toISOString()
+                        });
+                    } else {
+                        // 原本有 -> 只有備註有變才 update（不動 registred_at）
+                        const oldNote = (old.description || '').trim();
+                        if (oldNote !== note) {
+                            toUpdate.push({ id, note });
+                        }
+                    }
+                }
+
+                // 依序做：刪 -> 改 -> 增（順序其實彈性，但這樣比較直觀）
+                // 1) delete
+                if (toDelete.length > 0) {
+                    const { error } = await supabase
+                        .from('registrations')
+                        .delete()
+                        .eq('user_id', userId)
+                        .in('match_date_id', toDelete);
+
+                    if (error) {
+                        console.error('❌ 刪除取消報名失敗：', error);
+                        alert('更新失敗（刪除失敗）');
+                        return;
+                    }
+                }
+
+                // 2) update（逐筆更新備註）
+                if (toUpdate.length > 0) {
+                    const updates = await Promise.all(
+                        toUpdate.map(x =>
+                            supabase
+                                .from('registrations')
+                                .update({ description: x.note })
+                                .eq('user_id', userId)
+                                .eq('match_date_id', x.id)
+                        )
+                    );
+
+                    const bad = updates.find(r => r.error);
+                    if (bad && bad.error) {
+                        console.error('❌ 更新備註失敗：', bad.error);
+                        alert('更新失敗（更新備註失敗）');
+                        return;
+                    }
+                }
+
+                // 3) insert
+                if (toInsert.length > 0) {
+                    const { error } = await supabase.from('registrations').insert(toInsert);
+                    if (error) {
+                        console.error('❌ 新增報名失敗：', error);
+                        alert('更新失敗（新增失敗）');
+                        return;
+                    }
+                }
+
+                alert('已更新本月份的報名！');
+
+                // 重新載入，保持月份不跳走
+                await loadMatchDates(keepYM);
             });
-
-            if (insertData.length > 0) {
-                const { error: insertError } = await supabase.from('registrations').insert(insertData);
-                if (insertError) {
-                    console.error('❌ 報名失敗', insertError);
-                    alert('報名失敗，請稍後再試');
-                    return;
-                }
-            }
-
-            alert('已更新本月份的報名！');
-            const us = document.getElementById('user-select');
-            if (us) us.dispatchEvent(new Event('change'));
-
-            await loadMatchDates(keepYM);
-        });
 
         document.addEventListener('DOMContentLoaded', () => {
             loadMatchDates();
