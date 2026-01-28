@@ -207,15 +207,12 @@
                 const profile = JSON.parse(profileStr);
                 const userId = profile.id;
 
-                // 這次使用者勾選的日期
                 const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
                 const selectedIds = new Set(Array.from(checkboxes).map(cb => String(cb.value)));
 
-                // 取出「本月」所有日期 id（renderMonth 會更新它）
                 const monthIds = (__CURRENT_MONTH_DATE_IDS || []).map(String);
                 const monthIdSet = new Set(monthIds);
 
-                // 先抓資料庫「本月舊報名」（只抓這個月，避免掃整張表）
                 let existing = [];
                 if (monthIds.length > 0) {
                     const { data, error } = await supabase
@@ -234,20 +231,16 @@
 
                 const existingMap = new Map(existing.map(r => [String(r.match_date_id), r])); // key = match_date_id
 
-                // 組合：本次勾選對應的備註（只看本月，避免抓到別月 UI）
                 const selectedWithNotes = [];
                 for (const id of selectedIds) {
-                    // id 一定是 match_date_id
                     const noteInput = document.querySelector(`input[name="note-${id}"]`);
                     const note = noteInput ? noteInput.value.trim() : '';
                     selectedWithNotes.push({ id: String(id), note });
                 }
 
-                // 計算要刪 / 要增 / 要改
                 const toDelete = [];
                 for (const r of existing) {
                     const id = String(r.match_date_id);
-                    // 安全：只處理本月
                     if (!monthIdSet.has(id)) continue;
                     if (!selectedIds.has(id)) {
                         toDelete.push(id);
@@ -255,9 +248,8 @@
                 }
 
                 const toInsert = [];
-                const toUpdate = []; // {id, note}
+                const toUpdate = [];
                 for (const { id, note } of selectedWithNotes) {
-                    // 安全：只處理本月
                     if (!monthIdSet.has(id)) continue;
 
                     const old = existingMap.get(id);
@@ -278,8 +270,7 @@
                     }
                 }
 
-                // 依序做：刪 -> 改 -> 增（順序其實彈性，但這樣比較直觀）
-                // 1) delete
+                // delete
                 if (toDelete.length > 0) {
                     const { error } = await supabase
                         .from('registrations')
@@ -294,7 +285,7 @@
                     }
                 }
 
-                // 2) update（逐筆更新備註）
+                // update
                 if (toUpdate.length > 0) {
                     const updates = await Promise.all(
                         toUpdate.map(x =>
@@ -314,7 +305,7 @@
                     }
                 }
 
-                // 3) insert
+                // insert
                 if (toInsert.length > 0) {
                     const { error } = await supabase.from('registrations').insert(toInsert);
                     if (error) {
@@ -325,8 +316,6 @@
                 }
 
                 alert('已更新本月份的報名！');
-
-                // 重新載入，保持月份不跳走
                 await loadMatchDates(keepYM);
             });
 
