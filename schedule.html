@@ -173,6 +173,7 @@
             const GUEST_ADD_VALUE = `${GUEST_PREFIX}add`;
             const guestPickMap = new Map();
             const uuid4 = () => URL.createObjectURL(new Blob()).slice(-36);
+
             const maps = {
                 games: new Map(),
                 locs: new Map(),
@@ -180,7 +181,19 @@
                 datesLabel: new Map(),
                 teams: new Map(),
             };
+
             const getNote = (p) => (p?.note ?? p?.remark ?? '');
+
+            const fmtRegTime = (iso) => {
+                if (!iso) return '';
+                const d = new Date(iso);
+                const Y = d.getFullYear();
+                const M = String(d.getMonth() + 1).padStart(2, '0');
+                const D = String(d.getDate()).padStart(2, '0');
+                const h = String(d.getHours()).padStart(2, '0');
+                const m = String(d.getMinutes()).padStart(2, '0');
+                return `${Y}/${M}/${D} ${h}:${m}`;
+            };
 
             function attachNotePreview(selectEl) {
                 const holder = document.createElement('div');
@@ -195,17 +208,53 @@
                 selectEl.parentElement.appendChild(holder);
             }
 
+            function attachRegTimeOpenLabel(selectEl) {
+                const applyOpenLabels = () => {
+                    Array.from(selectEl.options).forEach(opt => {
+                        const open = opt.getAttribute('data-open');
+                        if (open) opt.textContent = open;
+                    });
+                };
+
+                const applyClosedLabel = () => {
+                    const opt = selectEl.options[selectEl.selectedIndex];
+                    if (!opt) return;
+                    const nameOnly = opt.getAttribute('data-name');
+                    if (nameOnly) opt.textContent = nameOnly;
+                };
+
+                applyClosedLabel();
+
+                selectEl.addEventListener('focus', applyOpenLabels);
+                selectEl.addEventListener('mousedown', applyOpenLabels);
+
+                selectEl.addEventListener('change', applyClosedLabel);
+                selectEl.addEventListener('blur', applyClosedLabel);
+            }
+
             function makePersonOptions(people, selectedId, withGuestAdd = true) {
                 const opts = ['<option value=""></option>'];
+
                 people.forEach(p => {
                     const sel = String(p.id) === String(selectedId) ? 'selected' : '';
                     const safeNote = (getNote(p) || '').replace(/"/g, '&quot;');
+
+                    const timeText = p.regTime ? fmtRegTime(p.regTime) : '';
+                    const labelOpen = timeText ? `${p.name} (${timeText})` : p.name;
+
                     opts.push(
-                        `<option value="${p.id}" ${sel} title="${p.name}${safeNote ? '：' + safeNote : ''}" data-note="${safeNote}">${p.name}</option>`
+                        `<option value="${p.id}" ${sel}
+                        data-name="${String(p.name).replace(/"/g, '&quot;')}"
+                        data-open="${String(labelOpen).replace(/"/g, '&quot;')}"
+                        data-note="${safeNote}"
+                        title="${String(labelOpen).replace(/"/g, '&quot;')}${safeNote ? '｜備註：' + safeNote : ''}">
+                        ${labelOpen}
+                        </option>`
                     );
                 });
+
                 if (withGuestAdd) {
-                    opts.push(`<option value="${GUEST_ADD_VALUE}" data-note="">＋加入臨時人員…</option>`);
+                    opts.push(`<option value="${GUEST_ADD_VALUE}" data-note="" data-name="" data-open="">＋加入臨時人員…</option>`);
                 }
                 return opts.join('');
             }
@@ -297,28 +346,54 @@
 
                 const { data: regs } = await supabase
                     .from('registrations')
-                    .select('user_id, match_date_id, description')
+                    .select('user_id, match_date_id, description, registred_at')
                     .in('match_date_id', Array.from(dateIds));
 
                 const peopleByDate = {};
                 const regUserIds = Array.from(new Set((regs || []).map(r => r.user_id)));
+
                 if (regUserIds.length) {
                     const { data: profs } = await supabase.from('profiles').select('id, name').in('id', regUserIds);
-                    (profs || []).forEach(p => {
-                        const uid = String(p.id);
-                        (regs || []).forEach(r => {
-                            if (String(r.user_id) !== uid) return;
-                            const did = String(r.match_date_id);
-                            if (!peopleByDate[did]) peopleByDate[did] = [];
-                            const exist = peopleByDate[did].find(x => x.id === uid);
-                            const regNote = (r.description || '').trim();
-                            if (!exist) peopleByDate[did].push({ id: uid, name: p.name, note: regNote });
-                            else {
-                                const setNotes = new Set([exist.note, regNote].filter(Boolean));
-                                exist.note = Array.from(setNotes).join(' / ');
-                            }
-                        });
+
+                    const mpByDate = new Map();
+
+                    (regs || []).forEach(r => {
+                        const did = String(r.match_date_id);
+                        const uid = String(r.user_id);
+                        const note = (r.description || '').trim();
+                        const regTime = r.registred_at || null;
+
+                        if (!mpByDate.has(did)) mpByDate.set(did, new Map());
+                        const mp = mpByDate.get(did);
+
+                        const p = (profs || []).find(x => String(x.id) === uid);
+                        const name = p ? p.name : `ID:${uid}`;
+
+                        if (!mp.has(uid)) {
+                            mp.set(uid, { id: uid, name, note, regTime });
+                        } else {
+                            const exist = mp.get(uid);
+
+                            const setNotes = new Set([exist.note, note].filter(Boolean));
+                            exist.note = Array.from(setNotes).join(' / ');
+
+                            const tOld = exist.regTime ? new Date(exist.regTime).getTime() : null;
+                            const tNew = regTime ? new Date(regTime).getTime() : null;
+                            if (tOld == null) exist.regTime = regTime;
+                            else if (tNew != null && tNew < tOld) exist.regTime = regTime;
+                        }
                     });
+
+                    for (const [did, mp] of mpByDate.entries()) {
+                        const arr = Array.from(mp.values());
+                        arr.sort((a, b) => {
+                            const ta = a.regTime ? new Date(a.regTime).getTime() : Number.MAX_SAFE_INTEGER;
+                            const tb = b.regTime ? new Date(b.regTime).getTime() : Number.MAX_SAFE_INTEGER;
+                            if (ta !== tb) return ta - tb;
+                            return String(a.name).localeCompare(String(b.name), 'zh-Hant');
+                        });
+                        peopleByDate[did] = arr;
+                    }
                 }
 
                 async function upsertGuestAssignment({ matchId, role, guestName, guestNote }) {
@@ -399,6 +474,7 @@
                     if (!groups.has(key)) groups.set(key, []);
                     groups.get(key).push(r);
                 });
+
                 const groupKeys = Array.from(groups.keys()).sort((a, b) => {
                     const [da] = a.split('|'), [db] = b.split('|');
                     const sa = maps.dates.get(String(da)) || '', sb = maps.dates.get(String(db)) || '';
@@ -422,7 +498,7 @@
                     const people = peopleByDate[String(did)] || [];
 
                     const supOpts = makePersonOptions(
-                        (supervisors || []).map(s => ({ id: String(s.id), name: s.name })),
+                        (supervisors || []).map(s => ({ id: String(s.id), name: s.name, regTime: null, note: '' })),
                         String(daySupervisorId || ''),
                         false
                     );
@@ -430,6 +506,7 @@
                     const body = list.map(r => {
                         const t1 = maps.teams.get(String(r.teams_id1)) || r.teams_id1 || '-';
                         const t2 = maps.teams.get(String(r.teams_id2)) || r.teams_id2 || '-';
+
                         const selHome = makePersonOptions(people, r.home_id);
                         const selB1 = makePersonOptions(people, r.base1_id);
                         const selB2 = makePersonOptions(people, r.base2_id);
@@ -462,6 +539,7 @@
                         <div class="bg-blue-50 px-4 py-3 font-semibold text-xl text-center relative">
                             ${dLabel} ${gameTitle} ｜ 地點：${locName}
                         </div>
+
                         <div class="overflow-x-auto">
                             <div class="min-w-[1100px]">
                             <table class="w-full text-lg bg-white text-center">
@@ -484,6 +562,7 @@
                             </table>
                             </div>
                         </div>
+
                         <div class="px-4 py-3 border-t bg-slate-50 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                             <div class="flex items-center gap-3">
                             <label class="font-semibold">監場：</label>
@@ -491,25 +570,27 @@
                                 ${supOpts}
                             </select>
                             </div>
+
                             <div class="flex items-center gap-4">
                             <div class="text-sm ${list.every(x => x.upload) ? 'text-green-600' : 'text-red-600'} font-medium">
                                 ${list.every(x => x.upload) ? '✔ 已上傳' : '✘ 尚未上傳'}
                             </div>
-                                <div class="flex gap-3">
-                                    <button class="btn-save-day px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" data-date="${did}" data-loc="${lid}">
-                                        儲存/取消上傳
-                                    </button>
-                                    <button class="btn-upload-day px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700" data-date="${did}" data-loc="${lid}">
-                                        上傳
-                                    </button>
-                                    <button
-                                        class="btn-download-pdf px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-                                        data-date="${did}" data-loc="${lid}"
-                                        data-title="${dLabel.replace(/"/g, '&quot;')}${gameTitle.replace(/"/g, '&quot;')}｜ 地點：${locName.replace(/"/g, '&quot;')}"
-                                        data-filename="${locName.replace(/[\\/:*?"<>|]/g, '_')}-${isoDate}">
-                                        下載班表
-                                    </button>
-                                </div>
+
+                            <div class="flex gap-3">
+                                <button class="btn-save-day px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700" data-date="${did}" data-loc="${lid}">
+                                儲存/取消上傳
+                                </button>
+                                <button class="btn-upload-day px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700" data-date="${did}" data-loc="${lid}">
+                                上傳
+                                </button>
+                                <button
+                                class="btn-download-pdf px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                                data-date="${did}" data-loc="${lid}"
+                                data-title="${dLabel.replace(/"/g, '&quot;')}${gameTitle.replace(/"/g, '&quot;')}｜ 地點：${locName.replace(/"/g, '&quot;')}"
+                                data-filename="${locName.replace(/[\\/:*?"<>|]/g, '_')}-${isoDate}">
+                                下載班表
+                                </button>
+                            </div>
                             </div>
                         </div>
                         </div>
@@ -519,12 +600,16 @@
                 el.result.querySelectorAll('select[name$="_id"]').forEach(attachNotePreview);
                 el.result.querySelectorAll('.day-supervisor').forEach(attachNotePreview);
 
+                el.result.querySelectorAll('select[name$="_id"]').forEach(attachRegTimeOpenLabel);
+                el.result.querySelectorAll('.day-supervisor').forEach(attachRegTimeOpenLabel);
+
                 const UNIQUE_KEYS = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
 
                 (function applyGuestSelections() {
                     const ROLE_KEYS = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
                     el.result.querySelectorAll('tbody tr[data-id]').forEach(tr => {
                         const matchId = tr.getAttribute('data-id');
+
                         ROLE_KEYS.forEach(role => {
                             const key = `${String(matchId)}:${role}`;
                             const row = guestByKey.get(key);
@@ -540,8 +625,12 @@
                             if (!sel) return;
 
                             const opt = document.createElement('option');
+                            const showName = `*${row.guest_name}`;
+
                             opt.value = `guest:${row.id || 'from-db'}`;
-                            opt.textContent = `*${row.guest_name}`;
+                            opt.textContent = showName;
+                            opt.setAttribute('data-name', showName);
+                            opt.setAttribute('data-open', showName);
                             if (row.guest_note) opt.setAttribute('data-note', row.guest_note);
 
                             const addOpt = Array.from(sel.options).find(o => o.value === GUEST_ADD_VALUE);
@@ -597,14 +686,21 @@
                         guestPickMap.set(key, { id: gid, name, note });
 
                         const opt = document.createElement('option');
+                        const showName = `*${name}`;
+
                         opt.value = `${GUEST_PREFIX}${gid}`;
-                        opt.textContent = `*${name}`;
+                        opt.textContent = showName;
+                        opt.setAttribute('data-name', showName);
+                        opt.setAttribute('data-open', showName);
                         opt.setAttribute('data-note', note);
+
                         const addOpt = Array.from(select.options).find(o => o.value === GUEST_ADD_VALUE);
                         if (addOpt) select.insertBefore(opt, addOpt); else select.appendChild(opt);
+
                         select.value = opt.value;
 
                         updateRowOptionLocks(tr);
+                        select.dispatchEvent(new Event('change'));
                     };
 
                     UNIQUE_KEYS.forEach(k => {
@@ -642,6 +738,8 @@
 
                             updateRowOptionLocks(tr);
                         });
+
+                        attachRegTimeOpenLabel(select);
                     });
 
                     updateRowOptionLocks(tr);
@@ -650,8 +748,6 @@
                 el.result.querySelectorAll('tbody tr[data-id]').forEach(tr => attachUniqueHandlersToRow(tr));
 
                 async function saveOneGroup(dateId, locId, uploadFlag) {
-                    const thresholdMinutes = 180;
-
                     const groupEl = el.result.querySelector(`.group[data-date="${dateId}"][data-loc="${locId}"]`);
                     if (!groupEl) { alert('找不到指定的表格'); return; }
 
@@ -676,61 +772,6 @@
                                 return;
                             }
                             seen.add(p.v);
-                        }
-                    }
-
-                    const hhmmToMinutes = (hhmm) => {
-                        if (!hhmm || !/^\d{2}:\d{2}/.test(hhmm)) return null;
-                        const [h, m] = hhmm.split(':').map(n => parseInt(n, 10));
-                        if (Number.isNaN(h) || Number.isNaN(m)) return null;
-                        return h * 60 + m;
-                    };
-                    const nameOf = (uid) => {
-                        const opt = tbody.querySelector(`select[name$="_id"] option[value="${uid}"]`);
-                        return opt ? opt.textContent.trim() : `ID:${uid}`;
-                    };
-
-                    const currentDayAssignments = new Map();
-                    const matchMeta = new Map();
-
-                    trs.forEach(tr => {
-                        const matchId = tr.getAttribute('data-id');
-                        const timeText = tr.getAttribute('data-time') || tr.querySelector('td:nth-child(2)')?.textContent?.trim() || '';
-                        const timeMin = hhmmToMinutes(timeText);
-                        if (timeMin == null) return;
-
-                        matchMeta.set(matchId, { time: timeText, locId: String(locId), locName: (maps.locs.get(String(locId)) || '') });
-
-                        UNIQUE_KEYS_LOCAL.forEach(k => {
-                            const uid = tr.querySelector(`select[name="${k}"]`)?.value || '';
-                            if (!uid || String(uid).startsWith(GUEST_PREFIX)) return;
-                            if (!currentDayAssignments.has(uid)) currentDayAssignments.set(uid, []);
-                            currentDayAssignments.get(uid).push({ matchId, timeMin, locId: String(locId), source: 'DOM' });
-                        });
-                    });
-
-                    const acc = conflictIndex.get(String(dateId)) || new Map();
-                    for (const [uid, recs] of currentDayAssignments.entries()) {
-                        const others = acc.get(String(uid)) || [];
-                        others.forEach(({ t, locId: otherLoc }) => {
-                            if (String(otherLoc) !== String(locId)) recs.push({ matchId: `X-${t}-${otherLoc}`, timeMin: t, locId: String(otherLoc), source: 'DB' });
-                        });
-
-                        recs.sort((a, b) => a.timeMin - b.timeMin);
-                        for (let i = 0; i < recs.length; i++) {
-                            for (let j = i + 1; j < recs.length; j++) {
-                                if (String(recs[i].locId) === String(recs[j].locId)) continue;
-                                const dt = Math.abs(recs[i].timeMin - recs[j].timeMin);
-                                if (dt < 180) {
-                                    const pName = nameOf(uid);
-                                    const m1 = matchMeta.get(recs[i].matchId);
-                                    const m2 = matchMeta.get(recs[j].matchId);
-                                    const m1Text = m1 ? `${m1.time} @ ${m1.locName}` : `比賽ID:${recs[i].matchId}`;
-                                    const m2Text = m2 ? `${m2.time} @ ${m2.locName}` : `比賽ID:${recs[j].matchId}`;
-                                    alert(`【跨場地時間衝突】\n裁判：${pName}\n${m1Text}\n與\n${m2Text}\n開賽時間相差小於 180 分鐘，請調整人員或時間後再儲存/上傳。`);
-                                    return;
-                                }
-                            }
                         }
                     }
 
@@ -837,167 +878,167 @@
                 el.tip.textContent = `共 ${rows.length} 場比賽。`;
             }
 
-        async function downloadGroupAsPNG(dateId, locId, titleText, filenameBase) {
-            if (downloadGroupAsPNG.__busy) return;
-            downloadGroupAsPNG.__busy = true;
+            async function downloadGroupAsPNG(dateId, locId, titleText, filenameBase) {
+                if (downloadGroupAsPNG.__busy) return;
+                downloadGroupAsPNG.__busy = true;
 
-            const release = () => { downloadGroupAsPNG.__busy = false; };
+                const release = () => { downloadGroupAsPNG.__busy = false; };
 
-            const groupEl = document.querySelector(`.group[data-date="${dateId}"][data-loc="${locId}"]`);
-            if (!groupEl) { alert('找不到要下載的班表區塊'); release(); return; }
+                const groupEl = document.querySelector(`.group[data-date="${dateId}"][data-loc="${locId}"]`);
+                if (!groupEl) { alert('找不到要下載的班表區塊'); release(); return; }
 
-            const table = groupEl.querySelector('table');
-            if (!table) { alert('這個班表沒有可下載的內容'); release(); return; }
+                const table = groupEl.querySelector('table');
+                if (!table) { alert('這個班表沒有可下載的內容'); release(); return; }
 
-            const supSel = groupEl.querySelector(`.day-supervisor[data-date="${dateId}"][data-loc="${locId}"]`);
-            const supervisorText = (() => {
-                if (!supSel) return '—';
-                const opt = supSel.options[supSel.selectedIndex] || Array.from(supSel.options).find(o => o.selected) || null;
-                const t = (opt && opt.textContent.trim()) ? opt.textContent.trim() : '';
-                return t || '—';
-            })();
+                const supSel = groupEl.querySelector(`.day-supervisor[data-date="${dateId}"][data-loc="${locId}"]`);
+                const supervisorText = (() => {
+                    if (!supSel) return '—';
+                    const opt = supSel.options[supSel.selectedIndex] || Array.from(supSel.options).find(o => o.selected) || null;
+                    const t = (opt && opt.textContent.trim()) ? opt.textContent.trim() : '';
+                    return t || '—';
+                })();
 
-            const getSelectDisplayText = (sel) => {
-                if (!sel) return '';
-                let txt = sel.options[sel.selectedIndex]?.textContent?.trim();
-                if (!txt) {
-                    const byAttr = Array.from(sel.options).find(o => o.selected);
-                    if (byAttr) txt = byAttr.textContent?.trim();
-                }
-                if (!txt) return '';
-                return txt.replace(/^\*/, '');
-            };
-
-            const cleanTable = table.cloneNode(true);
-            const origRows = table.querySelectorAll('tbody tr');
-            const cloneRows = cleanTable.querySelectorAll('tbody tr');
-            origRows.forEach((origTr, i) => {
-                const cloneTr = cloneRows[i];
-                if (!cloneTr) return;
-                const origSelects = origTr.querySelectorAll('select');
-                const cloneSelects = cloneTr.querySelectorAll('select');
-                origSelects.forEach((origSel, j) => {
-                    const cloneSel = cloneSelects[j];
-                    if (!cloneSel) return;
-                    cloneSel.value = origSel.value;
-                });
-            });
-
-            cleanTable.querySelectorAll('tbody tr').forEach((tr, idx) => {
-                if (idx % 2 === 1) tr.style.background = '#f8fbff';
-                tr.querySelectorAll('td').forEach(td => {
-                    const sel = td.querySelector('select');
-                    const inp = td.querySelector('input');
-                    if (sel) {
-                        const text = getSelectDisplayText(sel);
-                        td.innerHTML = `<span>${text}</span>`;
-                    } else if (inp) {
-                        td.innerHTML = `<span>${(inp.value || '').trim()}</span>`;
+                const getSelectDisplayText = (sel) => {
+                    if (!sel) return '';
+                    let txt = sel.options[sel.selectedIndex]?.textContent?.trim();
+                    if (!txt) {
+                        const byAttr = Array.from(sel.options).find(o => o.selected);
+                        if (byAttr) txt = byAttr.textContent?.trim();
                     }
-                });
-            });
+                    if (!txt) return '';
+                    return txt.replace(/^\*/, '');
+                };
 
-            const panel = document.createElement('div');
-            Object.assign(panel.style, {
-                position: 'fixed',
-                left: '-99999px',
-                top: '0',
-                zIndex: '2147483647',
-                display: 'inline-block',
-                width: 'auto',
-                maxWidth: 'none',
-                background: '#ffffff',
-                borderRadius: '12px',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
-                overflow: 'hidden',
-                fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
-                textAlign: 'center'
-            });
-
-            const header = document.createElement('div');
-            header.textContent = (titleText || '班表').replace(/&quot;/g, '"');
-            Object.assign(header.style, {
-                padding: '18px 20px',
-                fontSize: '24px',
-                fontWeight: '800',
-                color: '#fff',
-                background: 'linear-gradient(90deg,#2563eb,#1e40af)',
-                lineHeight: '1.4'
-            });
-            panel.appendChild(header);
-
-            const body = document.createElement('div');
-            Object.assign(body.style, {
-                padding: '14px 18px 8px 18px',
-                background: '#fff'
-            });
-
-            cleanTable.className = '';
-            cleanTable.style.tableLayout = 'auto';
-            cleanTable.style.width = 'auto';
-            cleanTable.style.maxWidth = 'none';
-            cleanTable.style.borderCollapse = 'collapse';
-            cleanTable.style.margin = '0 auto';
-
-            cleanTable.querySelectorAll('th, td').forEach(cell => {
-                const isTH = cell.tagName === 'TH';
-                cell.style.border = '1px solid #cfe0ff';
-                cell.style.padding = '10px 14px';
-                cell.style.fontSize = '18px';
-                cell.style.fontWeight = '700';
-                cell.style.textAlign = 'center';
-                cell.style.verticalAlign = 'middle';
-                cell.style.whiteSpace = 'nowrap';
-                cell.style.color = '#0f172a';
-                cell.style.lineHeight = '1.4';
-                cell.style.background = isTH ? '#eaf2ff' : (cell.style.background || '#fff');
-            });
-
-            body.appendChild(cleanTable);
-
-            const footer = document.createElement('div');
-            footer.textContent = `監場：${supervisorText}`;
-            Object.assign(footer.style, {
-                padding: '12px 6px 16px 6px',
-                fontSize: '18px',
-                fontWeight: '700',
-                color: '#1e3a8a',
-                textAlign: 'center',
-                lineHeight: '1.4'
-            });
-            body.appendChild(footer);
-
-            panel.appendChild(body);
-            document.body.appendChild(panel);
-            await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-            try {
-                const canvas = await html2canvas(panel, {
-                    backgroundColor: '#ffffff',
-                    scale: Math.min(Math.max(window.devicePixelRatio || 2, 2), 3),
-                    allowTaint: true,
-                    useCORS: true,
-                    windowWidth: Math.ceil(panel.getBoundingClientRect().width) + 20,
-                    windowHeight: Math.ceil(panel.getBoundingClientRect().height) + 40,
-                    logging: false
+                const cleanTable = table.cloneNode(true);
+                const origRows = table.querySelectorAll('tbody tr');
+                const cloneRows = cleanTable.querySelectorAll('tbody tr');
+                origRows.forEach((origTr, i) => {
+                    const cloneTr = cloneRows[i];
+                    if (!cloneTr) return;
+                    const origSelects = origTr.querySelectorAll('select');
+                    const cloneSelects = cloneTr.querySelectorAll('select');
+                    origSelects.forEach((origSel, j) => {
+                        const cloneSel = cloneSelects[j];
+                        if (!cloneSel) return;
+                        cloneSel.value = origSel.value;
+                    });
                 });
 
-                const dataURL = canvas.toDataURL('image/png');
-                const a = document.createElement('a');
-                a.href = dataURL;
-                const filenameSafe = (filenameBase || '班表').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '');
-                a.download = `${filenameSafe}.png`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-            } catch (err) {
-                console.error(err);
-                alert('下載圖片失敗，請再試一次');
-            } finally {
-                document.body.removeChild(panel);
-                release();
+                cleanTable.querySelectorAll('tbody tr').forEach((tr, idx) => {
+                    if (idx % 2 === 1) tr.style.background = '#f8fbff';
+                    tr.querySelectorAll('td').forEach(td => {
+                        const sel = td.querySelector('select');
+                        const inp = td.querySelector('input');
+                        if (sel) {
+                            const text = getSelectDisplayText(sel);
+                            td.innerHTML = `<span>${text}</span>`;
+                        } else if (inp) {
+                            td.innerHTML = `<span>${(inp.value || '').trim()}</span>`;
+                        }
+                    });
+                });
+
+                const panel = document.createElement('div');
+                Object.assign(panel.style, {
+                    position: 'fixed',
+                    left: '-99999px',
+                    top: '0',
+                    zIndex: '2147483647',
+                    display: 'inline-block',
+                    width: 'auto',
+                    maxWidth: 'none',
+                    background: '#ffffff',
+                    borderRadius: '12px',
+                    boxShadow: '0 10px 30px rgba(0,0,0,0.08)',
+                    overflow: 'hidden',
+                    fontFamily: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial',
+                    textAlign: 'center'
+                });
+
+                const header = document.createElement('div');
+                header.textContent = (titleText || '班表').replace(/&quot;/g, '"');
+                Object.assign(header.style, {
+                    padding: '18px 20px',
+                    fontSize: '24px',
+                    fontWeight: '800',
+                    color: '#fff',
+                    background: 'linear-gradient(90deg,#2563eb,#1e40af)',
+                    lineHeight: '1.4'
+                });
+                panel.appendChild(header);
+
+                const body = document.createElement('div');
+                Object.assign(body.style, {
+                    padding: '14px 18px 8px 18px',
+                    background: '#fff'
+                });
+
+                cleanTable.className = '';
+                cleanTable.style.tableLayout = 'auto';
+                cleanTable.style.width = 'auto';
+                cleanTable.style.maxWidth = 'none';
+                cleanTable.style.borderCollapse = 'collapse';
+                cleanTable.style.margin = '0 auto';
+
+                cleanTable.querySelectorAll('th, td').forEach(cell => {
+                    const isTH = cell.tagName === 'TH';
+                    cell.style.border = '1px solid #cfe0ff';
+                    cell.style.padding = '10px 14px';
+                    cell.style.fontSize = '18px';
+                    cell.style.fontWeight = '700';
+                    cell.style.textAlign = 'center';
+                    cell.style.verticalAlign = 'middle';
+                    cell.style.whiteSpace = 'nowrap';
+                    cell.style.color = '#0f172a';
+                    cell.style.lineHeight = '1.4';
+                    cell.style.background = isTH ? '#eaf2ff' : (cell.style.background || '#fff');
+                });
+
+                body.appendChild(cleanTable);
+
+                const footer = document.createElement('div');
+                footer.textContent = `監場：${supervisorText}`;
+                Object.assign(footer.style, {
+                    padding: '12px 6px 16px 6px',
+                    fontSize: '18px',
+                    fontWeight: '700',
+                    color: '#1e3a8a',
+                    textAlign: 'center',
+                    lineHeight: '1.4'
+                });
+                body.appendChild(footer);
+
+                panel.appendChild(body);
+                document.body.appendChild(panel);
+                await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+                try {
+                    const canvas = await html2canvas(panel, {
+                        backgroundColor: '#ffffff',
+                        scale: Math.min(Math.max(window.devicePixelRatio || 2, 2), 3),
+                        allowTaint: true,
+                        useCORS: true,
+                        windowWidth: Math.ceil(panel.getBoundingClientRect().width) + 20,
+                        windowHeight: Math.ceil(panel.getBoundingClientRect().height) + 40,
+                        logging: false
+                    });
+
+                    const dataURL = canvas.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    a.href = dataURL;
+                    const filenameSafe = (filenameBase || '班表').replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, '');
+                    a.download = `${filenameSafe}.png`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                } catch (err) {
+                    console.error(err);
+                    alert('下載圖片失敗，請再試一次');
+                } finally {
+                    document.body.removeChild(panel);
+                    release();
+                }
             }
-        }
         });
 
     document.getElementById('btn-view-registrations').addEventListener('click', async () => {
