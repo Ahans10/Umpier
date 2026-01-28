@@ -181,7 +181,8 @@
                     const updated = fmtTs(g.rules_updated_at);
                     const previewUrl = buildPreviewUrl(g.rules_url);
                     const downloadUrl = buildDownloadUrl(g.rules_url, `${g.name || 'rules'}.pdf`);
-                    const pinBadge = g.rules_pinned
+                    const showPinBadge = currentProfile?.role === 'admin' && !!g.rules_pinned;
+                    const pinBadge = showPinBadge
                         ? `<span class="ml-2 inline-block text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 align-middle">置頂</span>`
                         : '';
 
