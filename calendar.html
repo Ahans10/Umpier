@@ -10,13 +10,9 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 
     <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.css" rel="stylesheet">
-    <!-- FullCalendar 主程式 -->
     <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.8/index.global.min.js"></script>
-    
-    <!-- rrule 函式庫（必要） -->
+
     <script src="https://cdn.jsdelivr.net/npm/rrule@2.7.1/dist/es5/rrule.min.js"></script>
-    
-    <!-- FullCalendar 的 rrule 插件 -->
     <script src="https://cdn.jsdelivr.net/npm/@fullcalendar/rrule@6.1.8/index.global.min.js"></script>
 </head>
 
@@ -53,15 +49,116 @@
         </div>
 
         <div
-            class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-5xl mx-auto min-h-auto sm:min-h-auto">
-            <div id="calendar" class="w-full sm:max-w-4xl mx-auto mt-6 
-                        text-[12px] sm:text-base 
-                        [&_.fc-event-title]:whitespace-normal 
-                        [&_.fc-event-title]:break-words">
+            class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-5xl mx-auto">
+
+            <!-- 管理員才顯示新增面板 -->
+            <div id="add-panel" class="mt-10 max-w-4xl mx-auto hidden">
+                <div class="rounded-3xl border border-blue-300 bg-white/90 backdrop-blur p-8 shadow-xl">
+            
+                    <!-- 標題列 -->
+                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                        <div class="flex items-center gap-3">
+                            <div class="w-11 h-11 rounded-2xl bg-blue-600 text-white flex items-center justify-center shadow">
+                                <i class="fa-solid fa-calendar-plus text-xl"></i>
+                            </div>
+                            <div>
+                                <div class="text-2xl font-extrabold text-blue-900">新增行事曆事件</div>
+                            </div>
+                        </div>
+
+                        <div class="flex gap-2">
+                            <button id="mode-game-btn"
+                                class="px-5 py-2.5 rounded-xl border-2 border-blue-600 bg-blue-600 text-white font-bold hover:bg-blue-700 transition shadow-sm">
+                                依賽事
+                            </button>
+                            <button id="mode-date-btn"
+                                class="px-5 py-2.5 rounded-xl border-2 border-blue-600 text-blue-900 font-bold hover:bg-blue-50 transition">
+                                選日期
+                            </button>
+                        </div>
+                    </div>
+            
+                    <!-- 方式 1：依賽事 -->
+                    <div id="mode-game" class="hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-base sm:text-lg font-extrabold text-blue-900 mb-3">選擇賽事</label>
+                                <select id="games-select"
+                                    class="w-full rounded-xl border-2 border-blue-200 px-4 py-3 text-blue-900 font-medium focus:outline-none focus:border-blue-500 bg-white">
+                                </select>
+                            </div>
+            
+                            <div>
+                                <label class="block text-base sm:text-lg font-extrabold text-blue-900 mb-3">顯示文字（不顯示賽事名稱）</label>
+                                <input id="game-text" type="text" placeholder="例如：就是棒 / 有比賽 / 需報到"
+                                    class="w-full rounded-xl border-2 border-blue-200 px-4 py-3 text-blue-900 font-medium focus:outline-none focus:border-blue-500 bg-white" />
+                            </div>
+                        </div>
+
+                        <div class="mt-6 flex items-start gap-3 rounded-xl bg-blue-50 border border-blue-200 px-5 py-4">
+                            <i class="fa-solid fa-circle-info text-blue-600 mt-1"></i>
+                            <div class="text-sm sm:text-base text-blue-900 leading-relaxed font-medium">
+                                系統會自動根據該賽事的 <b>賽程日期</b>，
+                                在行事曆上顯示你設定的文字。
+                            </div>
+                        </div>
+            
+                        <div class="mt-6 flex justify-end">
+                            <button id="save-game-entry"
+                                class="px-6 py-3 rounded-xl bg-blue-600 text-white text-lg font-bold hover:bg-blue-700 transition shadow">
+                                <i class="fa-solid fa-plus mr-2"></i>新增事件
+                            </button>
+                        </div>
+                    </div>
+            
+                    <!-- 方式 2：選日期 -->
+                    <div id="mode-date" class="hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-base sm:text-lg font-extrabold text-blue-900 mb-3">已選日期區間</label>
+                                <input id="picked-range" type="text" readonly
+                                    class="w-full rounded-xl border-2 border-blue-200 px-4 py-3 bg-blue-50 text-blue-900 font-semibold" />
+                                <div class="mt-3 text-base sm:text-lg text-blue-800 font-semibold">
+                                    👉 在行事曆上 <span class="font-bold">拖曳選取</span> 或 <span class="font-bold">點擊</span> 日期即可
+                                </div>
+                            </div>
+            
+                            <div>
+                                <label class="block text-base sm:text-lg font-extrabold text-blue-900 mb-3">顯示文字</label>
+                                <input id="date-text" type="text" placeholder="例如：有比賽"
+                                    class="w-full rounded-xl border-2 border-blue-200 px-4 py-3 text-blue-900 font-medium focus:outline-none focus:border-blue-500 bg-white" />
+                            </div>
+                        </div>
+
+                        <div class="mt-6 flex items-start gap-3 rounded-xl bg-blue-50 border border-blue-200 px-5 py-4">
+                            <i class="fa-solid fa-lightbulb text-blue-600 mt-1"></i>
+                            <div class="text-sm sm:text-base text-blue-900 leading-relaxed font-medium">
+                                可一次選擇 <b>多天日期</b>，
+                                新增後點擊行事曆上的事件即可 <b>刪除</b>。
+                            </div>
+                        </div>
+            
+                        <div class="mt-6 flex justify-between">
+                            <button id="clear-picked"
+                                class="px-5 py-3 rounded-xl border-2 border-blue-300 text-blue-900 font-semibold hover:bg-blue-50 transition">
+                                清除已選日期
+                            </button>
+                            <button id="save-date-entry"
+                                class="px-6 py-3 rounded-xl bg-blue-600 text-white text-lg font-bold hover:bg-blue-700 transition shadow">
+                                <i class="fa-solid fa-plus mr-2"></i>新增事件
+                            </button>
+                        </div>
+                    </div>
+            
+                </div>
             </div>
 
+            <div id="calendar" class="w-full sm:max-w-4xl mx-auto mt-6 
+            text-[12px] sm:text-base 
+            [&_.fc-event-title]:whitespace-normal 
+            [&_.fc-event-title]:break-words"></div>
 
-            <div class="flex justify-center mt-4" id="back-button">
+            <div class="flex justify-center mt-6" id="back-button">
                 <a href="main.html"
                     class="text-center py-2 px-6 rounded-xl border-2 border-blue-600 text-blue-900 font-semibold hover:bg-gradient-to-r hover:from-blue-600 hover:to-blue-500 hover:text-white transition">
                     <i class="fas fa-arrow-left me-2"></i>返回首頁
@@ -76,78 +173,305 @@
             </small>
         </div>
     </div>
-</body>
-<script>
-    const supabaseUrl = 'https://qfupnebeqjzhqplqkuqz.supabase.co';
-    const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmdXBuZWJlcWp6aHFwbHFrdXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0OTgzNzksImV4cCI6MjA2NjA3NDM3OX0.NUeJJ9liEi1Ckx9BrCTIr5ibZqkPaxQYLVC7-VvbzvA';
-    const supabase = window.supabase ? window.supabase.createClient(supabaseUrl, supabaseKey) : window.Supabase.createClient(supabaseUrl, supabaseKey);
 
-    const profileStr = localStorage.getItem('profile');
-    if (profileStr) {
-        const profile = JSON.parse(profileStr);
-        const roleText = profile.role === 'admin' ? '管理員'
-            : profile.role === 'member' ? '裁判員' : '（未知身份）';
+    <script>
+        const supabaseUrl = 'https://qfupnebeqjzhqplqkuqz.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmdXBuZWJlcWp6aHFwbHFrdXF6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA0OTgzNzksImV4cCI6MjA2NjA3NDM3OX0.NUeJJ9liEi1Ckx9BrCTIr5ibZqkPaxQYLVC7-VvbzvA';
+        const supabase = window.supabase
+            ? window.supabase.createClient(supabaseUrl, supabaseKey)
+            : window.Supabase.createClient(supabaseUrl, supabaseKey);
 
-        document.getElementById('welcome-title').innerText = `${profile.name || ''} 您好 !`;
-        document.getElementById('profile-info').innerHTML = `
-            <div>${roleText}</div>
-        `;
-    }
+        function fmtLocalDate(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${dd}`;
+        }
 
-    document.addEventListener('DOMContentLoaded', function () {
-            const calendarEl = document.getElementById('calendar');
-            const calendar = new FullCalendar.Calendar(calendarEl, {
-            initialView: 'dayGridMonth',
-            height: 'auto',
-            expandRows: true,
-            dayMaxEventRows: true,
-            eventDisplay: 'block',
-            eventDidMount: function (info) {
-                info.el.setAttribute('title', info.event.title);
-            },
-            events: [
-                {
-                    title: '就是棒',
-                    rrule: {
-                        freq: 'weekly',
-                        interval: 1,
-                        byweekday: ['sa', 'su'],
-                        dtstart: '2025-08-24',
-                        until: '2025-09-28'
-                    },
-                    color: '#1E40AF',
-                    textColor: '#ffffff',
-                    classNames: ['font-bold', 'text-sm', 'px-1', 'py-0.5', 'rounded']
-                },
-                {
-                    title: '有比賽',
-                    start: '2025-10-04',
-                    end: '2025-10-07', // end 是不含這一天，所以要寫 10/7 表示到 10/6
-                    color: '#111827', // 更深色（幾乎黑色）
-                    textColor: '#ffffff',
-                    classNames: ['font-bold', 'text-sm', 'px-1', 'py-0.5', 'rounded']
-                },
-                {
-                    title: '有比賽',
-                    start: '2025-10-10',
-                    end: '2025-10-13', // 到 10/12
-                    color: '#111827',
-                    textColor: '#ffffff',
-                    classNames: ['font-bold', 'text-sm', 'px-1', 'py-0.5', 'rounded']
+        function addOneDay(dateStr) {
+            const d = new Date(dateStr + 'T12:00:00');
+            d.setDate(d.getDate() + 1);
+            return fmtLocalDate(d);
+        }
+
+        const profileStr = localStorage.getItem('profile');
+        let profile = null;
+
+        if (!profileStr) {
+            alert('請先登入');
+            window.location.href = 'index.html';
+        } else {
+            profile = JSON.parse(profileStr);
+            const roleText = profile.role === 'admin' ? '管理員'
+                : profile.role === 'member' ? '裁判員' : '（未知身份）';
+
+            document.getElementById('welcome-title').innerText = `${profile.name || ''} 您好 !`;
+            document.getElementById('profile-info').innerHTML = `<div>${roleText}</div>`;
+        }
+
+        const addPanel = document.getElementById('add-panel');
+        if (profile?.role === 'admin') addPanel.classList.remove('hidden');
+
+        function eventStyle(title, start, endExclusive, entryId, mode) {
+            const colorMap = {
+                game: '#1E40AF',
+                date: '#111827'
+            };
+
+            return {
+                title,
+                start,
+                end: endExclusive,
+                color: colorMap[mode] || '#111827',
+                textColor: '#ffffff',
+                classNames: ['font-bold', 'text-sm', 'px-1', 'py-0.5', 'rounded'],
+                extendedProps: { entry_id: entryId, mode }
+            };
+        }
+
+        function compressDatesToRanges(dateList) {
+            const dates = [...new Set(dateList)].sort();
+            const ranges = [];
+            if (dates.length === 0) return ranges;
+
+            let start = dates[0];
+            let prev = dates[0];
+
+            const toLocalDate = (s) => new Date(s + 'T12:00:00');
+
+            for (let i = 1; i < dates.length; i++) {
+                const cur = dates[i];
+                const prevD = toLocalDate(prev);
+                prevD.setDate(prevD.getDate() + 1);
+                const expected = fmtLocalDate(prevD);
+
+                if (cur === expected) {
+                    prev = cur;
+                } else {
+                    ranges.push({ start, end: prev });
+                    start = cur;
+                    prev = cur;
                 }
-            ],
-            locale: 'zh-tw',
-            firstDay: 0
-        });
+            }
+            ranges.push({ start, end: prev });
+            return ranges;
+        }
+
+        async function loadCalendarEvents() {
+            const { data: entries, error } = await supabase
+                .from('calendar_entries')
+                .select('*')
+                .order('created_at', { ascending: false });
+
+            if (error) {
+                alert('讀取行事曆資料失敗');
+                return [];
+            }
+
+            const events = [];
+
+            for (const e of entries.filter(x => x.mode === 'date')) {
+                events.push(eventStyle(
+                    e.text,
+                    e.start_date,
+                    addOneDay(e.end_date),
+                    e.id,
+                    'date'
+                ));
+            }
+
+            const gameEntries = entries.filter(x => x.mode === 'game' && x.games_id);
+            const gameIds = [...new Set(gameEntries.map(x => x.games_id))];
+
+            if (gameIds.length > 0) {
+                const { data: rows } = await supabase
+                    .from('matches')
+                    .select('games_id, match_dates:match_dates_id(date)')
+                    .in('games_id', gameIds);
+
+                const map = {};
+                for (const r of rows || []) {
+                    if (!map[r.games_id]) map[r.games_id] = [];
+                    if (r.match_dates?.date) map[r.games_id].push(r.match_dates.date);
+                }
+
+                for (const e of gameEntries) {
+                    const ranges = compressDatesToRanges(map[e.games_id] || []);
+                    for (const rg of ranges) {
+                        events.push(eventStyle(
+                            e.text,
+                            rg.start,
+                            addOneDay(rg.end),
+                            e.id,
+                            'game'
+                        ));
+                    }
+                }
+            }
+            return events;
+        }
+
+        async function loadGamesOptions() {
+            const sel = document.getElementById('games-select');
+            sel.innerHTML = '';
+            const { data } = await supabase.from('games').select('id, name').order('name');
+            sel.innerHTML = `<option value="">請選擇賽事</option>` +
+                (data || []).map(g => `<option value="${g.id}">${g.name}</option>`).join('');
+        }
+
+        document.addEventListener('DOMContentLoaded', async function () {
+            const calendarEl = document.getElementById('calendar');
+            let pickedStart = null;
+            let pickedEndExclusive = null;
+            let tapStart = null;
+
+            const calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'dayGridMonth',
+                selectable: true,
+                selectMirror: true,
+                height: 'auto',
+
+                select(info) {
+                    pickedStart = info.startStr;
+                    pickedEndExclusive = info.endStr;
+                    const end = new Date(info.end);
+                    end.setDate(end.getDate() - 1);
+                    document.getElementById('picked-range').value =
+                        `${pickedStart} ~ ${fmtLocalDate(end)}`;
+                },
+
+                dateClick(info) {
+                    const d = info.dateStr;
+
+                    if (!tapStart) {
+                        tapStart = d;
+                        pickedStart = d;
+                        pickedEndExclusive = addOneDay(d);
+                        document.getElementById('picked-range').value = `${d} ~ ${d}`;
+                        return;
+                    }
+
+                    const a = new Date(tapStart + 'T12:00:00');
+                    const b = new Date(d + 'T12:00:00');
+                    const start = a <= b ? tapStart : d;
+                    const end = a <= b ? d : tapStart;
+
+                    pickedStart = start;
+                    pickedEndExclusive = addOneDay(end);
+                    document.getElementById('picked-range').value = `${start} ~ ${end}`;
+                    tapStart = null;
+                },
+
+                eventClick: async function (info) {
+                    if (profile?.role !== 'admin') return;
+                    if (!confirm(`確定刪除「${info.event.title}」？`)) return;
+
+                    await supabase.from('calendar_entries')
+                        .delete()
+                        .eq('id', info.event.extendedProps.entry_id);
+
+                    calendar.removeAllEventSources();
+                    calendar.addEventSource(await loadCalendarEvents());
+                },
+
+                locale: 'zh-tw',
+                firstDay: 0
+            });
 
             calendar.render();
-    });
+            calendar.addEventSource(await loadCalendarEvents());
 
-    document.getElementById('logout-btn').addEventListener('click', function () {
-        localStorage.removeItem('profile');
-        window.location.href = 'index.html';
-    });
-</script>
+            if (profile?.role === 'admin') {
+                document.getElementById('mode-game-btn').onclick = async () => {
+                    document.getElementById('mode-game').classList.remove('hidden');
+                    document.getElementById('mode-date').classList.add('hidden');
+                    await loadGamesOptions();
+                };
 
+                document.getElementById('mode-date-btn').onclick = () => {
+                    document.getElementById('mode-date').classList.remove('hidden');
+                    document.getElementById('mode-game').classList.add('hidden');
+                };
+
+                document.getElementById('clear-picked').onclick = () => {
+                    pickedStart = pickedEndExclusive = tapStart = null;
+                    document.getElementById('picked-range').value = '';
+                    calendar.unselect();
+                };
+
+                document.getElementById('save-game-entry').addEventListener('click', async () => {
+                    try {
+                        if (profile?.role !== 'admin') return alert('只有管理員可以新增事件');
+
+                        const gamesId = document.getElementById('games-select').value;
+                        const text = document.getElementById('game-text').value.trim();
+
+                        if (!gamesId) return alert('請先選擇賽事');
+                        if (!text) return alert('請輸入要顯示的文字');
+
+                        const { error } = await supabase
+                            .from('calendar_entries')
+                            .insert([{ mode: 'game', games_id: gamesId, text }]);
+
+                        if (error) {
+                            console.error(error);
+                            return alert('新增失敗（請看 Console）');
+                        }
+
+                        calendar.removeAllEventSources();
+                        calendar.addEventSource(await loadCalendarEvents());
+                        document.getElementById('game-text').value = '';
+                        alert('新增成功 ✅');
+                    } catch (err) {
+                        console.error(err);
+                        alert('新增失敗（JS 發生錯誤，請看 Console）');
+                    }
+                });
+
+                document.getElementById('save-date-entry').addEventListener('click', async () => {
+                    try {
+                        if (profile?.role !== 'admin') return alert('只有管理員可以新增事件');
+
+                        const text = document.getElementById('date-text').value.trim();
+                        if (!pickedStart || !pickedEndExclusive) return alert('請在行事曆上先選取日期（可多天）');
+                        if (!text) return alert('請輸入要顯示的文字');
+
+                        const endEx = new Date(pickedEndExclusive + 'T12:00:00');
+                        endEx.setDate(endEx.getDate() - 1);
+                        const endDate = fmtLocalDate(endEx);
+
+                        const { error } = await supabase
+                            .from('calendar_entries')
+                            .insert([{ mode: 'date', text, start_date: pickedStart, end_date: endDate }]);
+
+                        if (error) {
+                            console.error(error);
+                            return alert('新增失敗（請看 Console）');
+                        }
+
+                        calendar.removeAllEventSources();
+                        calendar.addEventSource(await loadCalendarEvents());
+
+                        document.getElementById('date-text').value = '';
+                        pickedStart = null;
+                        pickedEndExclusive = null;
+                        document.getElementById('picked-range').value = '';
+                        calendar.unselect();
+
+                        alert('新增成功 ✅');
+                    } catch (err) {
+                        console.error(err);
+                        alert('新增失敗（JS 發生錯誤，請看 Console）');
+                    }
+                });
+            }
+        });
+
+        document.getElementById('logout-btn').onclick = () => {
+            localStorage.removeItem('profile');
+            window.location.href = 'index.html';
+        };
+    </script>
+</body>
 
 </html>
