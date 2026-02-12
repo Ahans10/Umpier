@@ -7,12 +7,12 @@
     <title>裁判出勤系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- ✅ 固定到 UMD 版，確保有 window.supabase 全域物件 -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 </head>
 
 <body
     class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-100 via-blue-200 via-30% to-blue-400 font-sans text-blue-900 font-[Segoe_UI]">
+
     <div class="container mx-auto py-10 px-4">
 
         <div class="rounded-2xl bg-white/90 backdrop-blur border border-blue-300 shadow-lg text-center py-8 mb-10">
@@ -27,6 +27,7 @@
 
         <div
             class="bg-white/90 border-2 border-blue-400/40 backdrop-blur-md rounded-2xl shadow-2xl p-12 w-full max-w-lg mx-auto">
+
             <div class="text-center mb-6">
                 <div class="text-4xl text-blue-500 mb-2"><i class="fas fa-user-circle"></i></div>
                 <h4 class="text-xl font-semibold text-blue-900">歡迎回來！</h4>
@@ -34,49 +35,59 @@
             </div>
 
             <form id="login-form">
+
                 <div class="mb-4">
-                    <label for="email" class="text-blue-900 font-semibold mb-2 block">
+                    <label class="text-blue-900 font-semibold mb-2 block">
                         <i class="fas fa-user me-2"></i>帳號
                     </label>
                     <div class="flex items-center rounded-xl overflow-hidden border-2 border-blue-300 bg-white">
-                        <span class="px-3 text-blue-500 border-r-2 border-blue-300 bg-white"><i
+                        <span class="px-3 text-blue-500 border-r-2 border-blue-300"><i
                                 class="fas fa-id-card"></i></span>
-                        <input type="email" id="email" name="email" placeholder="請輸入您的電子郵件" required autofocus
-                            class="w-full px-4 py-2 text-blue-900 bg-transparent outline-none">
+                        <input type="email" id="email" required class="w-full px-4 py-2 text-blue-900 outline-none"
+                            placeholder="請輸入您的電子郵件">
                     </div>
                 </div>
 
                 <div class="mb-4">
-                    <label for="password" class="text-blue-900 font-semibold mb-2 block">
+                    <label class="text-blue-900 font-semibold mb-2 block">
                         <i class="fas fa-lock me-2"></i>密碼
                     </label>
                     <div class="flex items-center rounded-xl overflow-hidden border-2 border-blue-300 bg-white">
-                        <span class="px-3 text-blue-500 border-r-2 border-blue-300 bg-white"><i
-                                class="fas fa-key"></i></span>
-                        <input type="password" id="password" name="password" minlength="8" placeholder="請輸入您的密碼"
-                            required class="w-full px-4 py-2 text-blue-900 bg-transparent outline-none">
+                        <span class="px-3 text-blue-500 border-r-2 border-blue-300"><i class="fas fa-key"></i></span>
+                        <input type="password" id="password" minlength="8" required
+                            class="w-full px-4 py-2 text-blue-900 outline-none" placeholder="請輸入您的密碼">
                     </div>
                 </div>
 
                 <button type="submit"
-                    class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-400 text-white font-semibold shadow-md hover:from-blue-600 hover:to-blue-500 transform hover:-translate-y-0.5 transition mb-2">
+                    class="w-full py-3 rounded-xl bg-gradient-to-r from-blue-500 to-blue-400 text-white font-semibold shadow-md hover:from-blue-600 hover:to-blue-500 transition mb-2">
                     <i class="fas fa-sign-in-alt me-2"></i>立即登入
                 </button>
-                <!-- ✅ 只保留一個 message 容器，避免重複 ID -->
+
+                <!-- 🔹 忘記密碼按鈕 -->
+                <button type="button" id="forgot-btn"
+                    class="w-full py-2 rounded-xl border-2 border-blue-300 text-blue-800 font-semibold hover:bg-blue-50 transition">
+                    <i class="fas fa-envelope me-2"></i>忘記密碼？
+                </button>
+
                 <div id="message" class="mt-4 text-blue-700 font-bold text-center"></div>
+
             </form>
 
             <div class="text-center text-sm text-blue-500 my-4">
                 <hr class="border-blue-300 my-3">還沒有帳號嗎？
             </div>
+
             <div class="text-center bg-blue-100 border border-blue-200 text-blue-900 text-sm rounded-xl px-4 py-2">
-                <i class="fas fa-info-circle me-2"></i>如果您沒有帳號或忘記密碼，請聯繫管理員
+                <i class="fas fa-info-circle me-2"></i>請聯繫管理員建立帳號
             </div>
+
         </div>
 
         <div class="text-center mt-10">
             <small class="text-blue-800"><i class="fas fa-copyright mr-1"></i>裁判出勤系統</small>
         </div>
+
     </div>
 
     <script>
@@ -102,30 +113,53 @@
             }
 
             const { data, error } = await sb.auth.signInWithPassword({ email, password });
+
             if (error || !data?.user) {
-                msgEl.textContent = '登入失敗：' + (error?.message === 'Invalid login credentials' ? '帳號或密碼錯誤' : (error?.message || '不明錯誤'));
+                msgEl.textContent = '登入失敗：帳號或密碼錯誤';
                 return;
             }
 
-            // 以目前登入者 id 重新抓 profiles，確保 localStorage 是最新、且 user.id 對得上
             const user = data.user;
-            const { data: profile, error: pErr } = await sb
+            const { data: profile } = await sb
                 .from('profiles')
                 .select('*')
                 .eq('id', user.id)
                 .maybeSingle();
 
-            if (pErr || !profile) {
-                localStorage.removeItem('profile');
-                msgEl.textContent = '登入成功，但查無個人資料，請聯繫管理員建立檔案';
-                window.location.href = 'main.html';
+            if (!profile) {
+                msgEl.textContent = '登入成功，但查無個人資料';
                 return;
             }
 
             localStorage.setItem('profile', JSON.stringify(profile));
             window.location.href = profile.first_login === true ? 'change_password.html' : 'main.html';
         });
+
+        /* 忘記密碼功能 */
+        document.getElementById('forgot-btn').addEventListener('click', async () => {
+
+            msgEl.textContent = '';
+            const email = document.getElementById('email').value.trim();
+
+            if (!email) {
+                msgEl.textContent = '請先輸入帳號 Email';
+                return;
+            }
+
+            const { error } = await sb.auth.resetPasswordForEmail(email, {
+                redirectTo: 'https://ahans10.github.io/Umpier/reset_password.html'
+            });
+
+            if (error) {
+                msgEl.textContent = '寄送失敗：' + error.message;
+                return;
+            }
+
+            msgEl.textContent = '重設密碼信已寄出，請至信箱查收 ✅';
+
+        });
     </script>
+
 </body>
 
 </html>
