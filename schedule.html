@@ -203,79 +203,70 @@
             }
 
             function ensureOverlay() {
-            let overlay = document.getElementById('global-loading-overlay');
-            if (overlay) return overlay;
+                let overlay = document.getElementById('global-loading-overlay');
+                if (overlay) return overlay;
 
-            overlay = document.createElement('div');
-            overlay.id = 'global-loading-overlay';
-            overlay.className = 'hidden fixed inset-0 z-[9999] bg-black/40 backdrop-blur-[2px] flex items-center justify-center px-4';
+                overlay = document.createElement('div');
+                overlay.id = 'global-loading-overlay';
+                overlay.className = 'hidden fixed inset-0 z-[9999] bg-black/40 backdrop-blur-[2px] flex items-center justify-center px-4';
 
-            overlay.innerHTML = `
-                                <div class="bg-white rounded-2xl shadow-2xl px-8 py-7 w-full max-w-md text-center border border-slate-200">
+                overlay.innerHTML = `
+                                    <div class="bg-white rounded-2xl shadow-2xl px-8 py-7 w-full max-w-md text-center border border-slate-200">
+                                        <div class="flex justify-center mb-4">
+                                            <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                                        </div>
 
-                                    <div class="flex justify-center mb-4">
-                                        <div class="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                                        <div id="global-loading-title" class="text-2xl font-extrabold text-slate-800 tracking-wide">
+                                            處理中...
+                                        </div>
+
+                                        <div id="global-loading-progress" class="mt-2 text-lg font-semibold text-blue-600"></div>
+
+                                        <div id="global-loading-subtitle" class="mt-2 text-base text-slate-600">
+                                            請稍候，系統正在執行中
+                                        </div>
+
+                                        <div class="flex justify-center gap-2 mt-4">
+                                            <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
+                                            <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-150"></div>
+                                            <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-300"></div>
+                                        </div>
                                     </div>
+                                `;
 
-                                    <div id="global-loading-title"
-                                        class="text-2xl font-extrabold text-slate-800 tracking-wide">
-                                        處理中...
-                                    </div>
-
-                                    <div id="global-loading-progress"
-                                        class="mt-2 text-lg font-semibold text-blue-600">
-                                    </div>
-
-                                    <div id="global-loading-subtitle"
-                                        class="mt-2 text-base text-slate-600">
-                                        請稍候，系統正在執行中
-                                    </div>
-
-                                    <div class="flex justify-center gap-2 mt-4">
-                                        <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                                        <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-150"></div>
-                                        <div class="w-2 h-2 bg-blue-500 rounded-full animate-bounce delay-300"></div>
-                                    </div>
-
-                                </div>
-                            `;
-
-            document.body.appendChild(overlay);
-            return overlay;
-        }
-
-        function showOverlay(title = '處理中...', subtitle = '請稍候，系統正在執行中', progress = '') {
-
-            const overlay = ensureOverlay();
-
-            const titleEl = document.getElementById('global-loading-title');
-            const subtitleEl = document.getElementById('global-loading-subtitle');
-            const progressEl = document.getElementById('global-loading-progress');
-
-            if (titleEl) titleEl.textContent = title;
-            if (subtitleEl) subtitleEl.textContent = subtitle;
-
-            if (progressEl) {
-                progressEl.textContent = progress || '';
-                progressEl.style.display = progress ? 'block' : 'none';
+                document.body.appendChild(overlay);
+                return overlay;
             }
 
-            overlay.classList.remove('hidden');
-            document.body.style.overflow = 'hidden';
-        }
+            function showOverlay(title = '處理中...', subtitle = '請稍候，系統正在執行中', progress = '') {
+                const overlay = ensureOverlay();
 
-        async function hideOverlay(delay = 0) {
+                const titleEl = document.getElementById('global-loading-title');
+                const subtitleEl = document.getElementById('global-loading-subtitle');
+                const progressEl = document.getElementById('global-loading-progress');
 
-            if (delay) {
-                await new Promise(res => setTimeout(res, delay));
+                if (titleEl) titleEl.textContent = title;
+                if (subtitleEl) subtitleEl.textContent = subtitle;
+
+                if (progressEl) {
+                    progressEl.textContent = progress || '';
+                    progressEl.style.display = progress ? 'block' : 'none';
+                }
+
+                overlay.classList.remove('hidden');
+                document.body.style.overflow = 'hidden';
             }
 
-            const overlay = document.getElementById('global-loading-overlay');
+            async function hideOverlay(delay = 0) {
+                if (delay) {
+                    await new Promise(res => setTimeout(res, delay));
+                }
 
-            if (overlay) overlay.classList.add('hidden');
+                const overlay = document.getElementById('global-loading-overlay');
+                if (overlay) overlay.classList.add('hidden');
 
-            document.body.style.overflow = '';
-        }
+                document.body.style.overflow = '';
+            }
 
             const GUEST_PREFIX = 'guest:';
             const GUEST_ADD_VALUE = `${GUEST_PREFIX}add`;
@@ -292,6 +283,14 @@
 
             const getNote = (p) => (p?.note ?? p?.remark ?? '');
             const escapeAttr = (v) => String(v ?? '').replace(/"/g, '&quot;');
+            const encodeOriginal = (obj) => encodeURIComponent(JSON.stringify(obj || {}));
+            const decodeOriginal = (str) => {
+                try {
+                    return JSON.parse(decodeURIComponent(str || ''));
+                } catch {
+                    return {};
+                }
+            };
 
             const fmtRegTime = (iso) => {
                 if (!iso) return '';
@@ -303,6 +302,67 @@
                 const m = String(d.getMinutes()).padStart(2, '0');
                 return `${Y}/${M}/${D} ${h}:${m}`;
             };
+
+            const normalizeValue = (v) => {
+                if (v === undefined || v === '') return null;
+                return v;
+            };
+
+            function getRowOriginal(tr) {
+                return decodeOriginal(tr.dataset.original || '');
+            }
+
+            function setRowOriginal(tr, payload) {
+                tr.dataset.original = encodeOriginal(payload);
+            }
+
+            function getRowCurrentPayload(tr, supervisor_id, uploadFlag) {
+                const UNIQUE_KEYS_LOCAL = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
+
+                const payload = {
+                    upload: !!uploadFlag,
+                    supervisor_id: normalizeValue(supervisor_id),
+                    remark: null,
+                    home_id: null,
+                    base1_id: null,
+                    base2_id: null,
+                    base3_id: null,
+                    recorder_id: null
+                };
+
+                UNIQUE_KEYS_LOCAL.forEach(k => {
+                    const sel = tr.querySelector(`select[name="${k}"]`);
+                    const v = sel ? (sel.value || null) : null;
+
+                    if (v && String(v).startsWith(GUEST_PREFIX)) {
+                        payload[k] = null;
+                    } else {
+                        payload[k] = normalizeValue(v);
+                    }
+                });
+
+                const remark = tr.querySelector('input[name="remark"]')?.value ?? null;
+                payload.remark = (remark && remark.trim()) ? remark.trim() : null;
+
+                return payload;
+            }
+
+            function isPayloadChanged(a, b) {
+                const keys = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id', 'remark', 'supervisor_id', 'upload'];
+                return keys.some(k => String(a?.[k] ?? '') !== String(b?.[k] ?? ''));
+            }
+
+            function refreshGroupUploadStatus(groupEl, uploadFlag) {
+                const statusEl = groupEl.querySelector('.upload-status-text');
+                if (!statusEl) return;
+
+                statusEl.textContent = uploadFlag ? '✔ 已上傳' : '✘ 尚未上傳';
+                statusEl.className = `upload-status-text text-sm ${uploadFlag ? 'text-green-600' : 'text-red-600'} font-medium`;
+            }
+
+            function markRowDirty(tr, dirty = true) {
+                tr.dataset.dirty = dirty ? '1' : '0';
+            }
 
             function attachNotePreview(selectEl) {
                 const holder = document.createElement('div');
@@ -647,8 +707,26 @@
                         const selB3 = makePersonOptions(people, r.base3_id);
                         const selRec = makePersonOptions(people, r.recorder_id);
 
+                        const originalPayload = {
+                            home_id: r.home_id || null,
+                            base1_id: r.base1_id || null,
+                            base2_id: r.base2_id || null,
+                            base3_id: r.base3_id || null,
+                            recorder_id: r.recorder_id || null,
+                            remark: (r.remark && r.remark.trim()) ? r.remark.trim() : null,
+                            supervisor_id: daySupervisorId || null,
+                            upload: !!r.upload
+                        };
+
                         return `
-                            <tr data-id="${r.id}" data-time="${(r.time || '').slice(0, 5)}" data-loc="${lid}" data-date="${did}">
+                            <tr 
+                                data-id="${r.id}" 
+                                data-time="${(r.time || '').slice(0, 5)}" 
+                                data-loc="${lid}" 
+                                data-date="${did}"
+                                data-dirty="0"
+                                data-original="${encodeOriginal(originalPayload)}"
+                            >
                                 <td class="border px-2 py-1 text-center">${r.session || '-'}</td>
                                 <td class="border px-2 py-1 text-center whitespace-nowrap">${(r.time || '').slice(0, 5) || '-'}</td>
                                 <td class="border px-2 py-1 text-center">${t1}</td>
@@ -706,7 +784,7 @@
                                 </div>
 
                                 <div class="flex items-center gap-4 flex-wrap">
-                                    <div class="text-sm ${list.every(x => x.upload) ? 'text-green-600' : 'text-red-600'} font-medium">
+                                    <div class="upload-status-text text-sm ${list.every(x => x.upload) ? 'text-green-600' : 'text-red-600'} font-medium">
                                         ${list.every(x => x.upload) ? '✔ 已上傳' : '✘ 尚未上傳'}
                                     </div>
 
@@ -847,7 +925,7 @@
                         else select.appendChild(opt);
 
                         select.value = opt.value;
-
+                        markRowDirty(tr, true);
                         updateRowOptionLocks(tr);
                         select.dispatchEvent(new Event('change'));
                     };
@@ -864,6 +942,7 @@
 
                             const val = select.value || '';
                             if (!val) {
+                                markRowDirty(tr, true);
                                 updateRowOptionLocks(tr);
                                 return;
                             }
@@ -889,16 +968,32 @@
                                 }
                             }
 
+                            markRowDirty(tr, true);
                             updateRowOptionLocks(tr);
                         });
 
                         attachRegTimeOpenLabel(select);
                     });
 
+                    const remarkInput = tr.querySelector('input[name="remark"]');
+                    if (remarkInput) {
+                        remarkInput.addEventListener('input', () => {
+                            markRowDirty(tr, true);
+                        });
+                    }
+
                     updateRowOptionLocks(tr);
                 }
 
                 el.result.querySelectorAll('tbody tr[data-id]').forEach(tr => attachUniqueHandlersToRow(tr));
+
+                el.result.querySelectorAll('.day-supervisor').forEach(sel => {
+                    sel.addEventListener('change', () => {
+                        const groupEl = sel.closest('.group');
+                        if (!groupEl) return;
+                        groupEl.querySelectorAll('tbody tr[data-id]').forEach(tr => markRowDirty(tr, true));
+                    });
+                });
 
                 hideOverlay();
                 setTip(`查詢完成，共 ${rows.length} 場比賽。`, 'success');
@@ -1167,7 +1262,7 @@
                 const supervisorSel = groupEl.querySelector(`.day-supervisor[data-date="${dateId}"][data-loc="${locId}"]`);
                 const supervisor_id = supervisorSel ? (supervisorSel.value || null) : null;
 
-                const trs = tbody.querySelectorAll('tr[data-id]');
+                const trs = Array.from(tbody.querySelectorAll('tr[data-id]'));
                 const UNIQUE_KEYS_LOCAL = ['home_id', 'base1_id', 'base2_id', 'base3_id', 'recorder_id'];
 
                 for (const tr of trs) {
@@ -1192,12 +1287,16 @@
                 }
 
                 const updates = [];
+                const changedRows = [];
                 const guestRows = [];
-                const guestKeysToDelete = new Set();
+                const guestDeleteTargets = [];
 
                 trs.forEach(tr => {
                     const matchId = String(tr.getAttribute('data-id'));
-                    const payload = { upload: uploadFlag, supervisor_id };
+                    const currentPayload = getRowCurrentPayload(tr, supervisor_id, uploadFlag);
+                    const originalPayload = getRowOriginal(tr);
+                    const changed = isPayloadChanged(currentPayload, originalPayload);
+                    const dirty = tr.dataset.dirty === '1';
 
                     UNIQUE_KEYS_LOCAL.forEach(k => {
                         const sel = tr.querySelector(`select[name="${k}"]`);
@@ -1205,7 +1304,6 @@
                         const key = `${matchId}:${k}`;
 
                         if (v && String(v).startsWith(GUEST_PREFIX)) {
-                            payload[k] = null;
                             const gp = guestPickMap.get(key);
                             if (gp && gp.name) {
                                 guestRows.push({
@@ -1216,36 +1314,49 @@
                                 });
                             }
                         } else {
-                            payload[k] = v ? v : null;
-                            guestKeysToDelete.add(key);
-                            guestPickMap.delete(key);
+                            guestDeleteTargets.push({ match_id: matchId, role: k });
                         }
                     });
 
-                    const remark = tr.querySelector('input[name="remark"]')?.value ?? null;
-                    payload.remark = (remark && remark.trim()) ? remark.trim() : null;
-                    updates.push({ id: matchId, payload });
+                    if (changed || dirty) {
+                        updates.push({ id: matchId, payload: currentPayload, tr });
+                        changedRows.push(tr);
+                    }
                 });
 
-                for (const u of updates) {
-                    const { error: updErr } = await supabase.from('matches').update(u.payload).eq('id', u.id);
-                    if (updErr) {
-                        console.error('更新失敗 payload=', u.payload, 'err=', updErr);
+                if (updates.length === 0) {
+                    hideOverlay();
+                    setButtonsDisabled('.btn-save-day, .btn-upload-day', false);
+                    setTip('沒有異動資料，不需要儲存。', 'info');
+                    return;
+                }
+
+                const updateResults = await Promise.all(
+                    updates.map(u => supabase.from('matches').update(u.payload).eq('id', u.id))
+                );
+
+                for (let i = 0; i < updateResults.length; i++) {
+                    const updRes = updateResults[i];
+                    if (updRes.error) {
+                        console.error('更新失敗 payload=', updates[i].payload, 'err=', updRes.error);
                         hideOverlay();
                         setTip('儲存失敗，請稍後再試', 'error');
                         setButtonsDisabled('.btn-save-day, .btn-upload-day', false);
-                        alert('部分資料更新失敗（寫入 matches）。\n' + (updErr.message || ''));
+                        alert('部分資料更新失敗（寫入 matches）。\n' + (updRes.error.message || ''));
                         return;
                     }
                 }
 
                 try {
-                    for (const key of guestKeysToDelete) {
-                        const [mid, role] = key.split(':');
-                        await supabase.from('match_guest_assignments')
+                    const changedMatchIds = Array.from(new Set(updates.map(u => String(u.id))));
+                    const changedDeleteTargets = guestDeleteTargets.filter(x => changedMatchIds.includes(String(x.match_id)));
+
+                    for (const target of changedDeleteTargets) {
+                        await supabase
+                            .from('match_guest_assignments')
                             .delete()
-                            .eq('match_id', mid)
-                            .eq('role', role);
+                            .eq('match_id', target.match_id)
+                            .eq('role', target.role);
                     }
                 } catch (e) {
                     console.warn('刪除舊臨時人員時例外（不影響 matches）：', e);
@@ -1253,31 +1364,42 @@
 
                 if (guestRows.length) {
                     try {
-                        const uniqKeys = new Set(guestRows.map(g => `${g.match_id}:${g.role}`));
-                        for (const key of uniqKeys) {
-                            const [mid, role] = key.split(':');
-                            await supabase.from('match_guest_assignments')
-                                .delete()
-                                .eq('match_id', mid)
-                                .eq('role', role);
-                        }
-                        const { error: insErr } = await supabase.from('match_guest_assignments').insert(guestRows);
-                        if (insErr) {
-                            console.warn('寫入臨時人員失敗（不影響 matches）：', insErr);
+                        const changedMatchIds = Array.from(new Set(updates.map(u => String(u.id))));
+                        const changedGuestRows = guestRows.filter(g => changedMatchIds.includes(String(g.match_id)));
+
+                        if (changedGuestRows.length) {
+                            const uniqKeys = new Set(changedGuestRows.map(g => `${g.match_id}:${g.role}`));
+                            for (const key of uniqKeys) {
+                                const [mid, role] = key.split(':');
+                                await supabase
+                                    .from('match_guest_assignments')
+                                    .delete()
+                                    .eq('match_id', mid)
+                                    .eq('role', role);
+                            }
+
+                            const { error: insErr } = await supabase.from('match_guest_assignments').insert(changedGuestRows);
+                            if (insErr) {
+                                console.warn('寫入臨時人員失敗（不影響 matches）：', insErr);
+                            }
                         }
                     } catch (e) {
                         console.warn('寫入臨時人員時例外（不影響 matches）：', e);
                     }
                 }
 
+                changedRows.forEach(tr => {
+                    const latestPayload = getRowCurrentPayload(tr, supervisor_id, uploadFlag);
+                    setRowOriginal(tr, latestPayload);
+                    markRowDirty(tr, false);
+                });
+
+                refreshGroupUploadStatus(groupEl, uploadFlag);
+
                 hideOverlay();
                 showToast(uploadFlag ? '上傳完成！(已將本日裁判表上傳至裁判員頁面)' : '儲存/取消上傳成功！', 'success');
-                setTip(uploadFlag ? '上傳完成！' : '儲存完成！', 'success');
+                setTip(uploadFlag ? `上傳完成！本次同步 ${updates.length} 筆異動資料。` : `儲存完成！本次同步 ${updates.length} 筆異動資料。`, 'success');
                 setButtonsDisabled('.btn-save-day, .btn-upload-day', false);
-
-                const currentDate = el.date.value || null;
-                const currentLoc = el.loc.value || null;
-                runQuery({ dateId: currentDate, locId: currentLoc });
             }
 
             el.result.addEventListener('click', (e) => {
