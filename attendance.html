@@ -198,126 +198,207 @@
             }).join('');
         }
 
+        function showToast(message, type = 'info', duration = 2600) {
+            let toastContainer = document.getElementById('toast-container');
+
+            if (!toastContainer) {
+                    toastContainer = document.createElement('div');
+                    toastContainer.id = 'toast-container';
+                    toastContainer.className = 'fixed top-4 right-4 z-[10000] flex flex-col gap-3 pointer-events-none';
+                    document.body.appendChild(toastContainer);
+        }
+
+            const styles = {
+                    success: {
+                    wrap: 'border-green-200 bg-green-50',
+                    iconBg: 'bg-green-100 text-green-600',
+                    title: 'text-green-800',
+                    text: 'text-green-700',
+                    icon: 'fa-check'
+            },
+            error: {
+                    wrap: 'border-red-200 bg-red-50',
+                    iconBg: 'bg-red-100 text-red-600',
+                    title: 'text-red-800',
+                    text: 'text-red-700',
+                    icon: 'fa-circle-xmark'
+            },
+            warning: {
+                    wrap: 'border-yellow-200 bg-yellow-50',
+                    iconBg: 'bg-yellow-100 text-yellow-600',
+                    title: 'text-yellow-800',
+                    text: 'text-yellow-700',
+                    icon: 'fa-triangle-exclamation'
+            },
+            info: {
+                    wrap: 'border-blue-200 bg-blue-50',
+                    iconBg: 'bg-blue-100 text-blue-600',
+                    title: 'text-blue-800',
+                    text: 'text-blue-700',
+                    icon: 'fa-circle-info'
+            }
+        };
+
+        const cfg = styles[type] || styles.info;
+        const toast = document.createElement('div');
+        toast.className = `pointer-events-auto w-[320px] max-w-[calc(100vw-2rem)] rounded-2xl border shadow-xl ${cfg.wrap} overflow-hidden transition-all duration-300 opacity-0 translate-y-[-8px]`;
+
+        toast.innerHTML = `
+                    <div class="p-4">
+                        <div class="flex items-start gap-3">
+                            <div class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${cfg.iconBg}">
+                                <i class="fas ${cfg.icon}"></i>
+                            </div>
+                            <div class="min-w-0 flex-1">
+                                <div class="font-semibold ${cfg.title} mb-1">
+                                    ${type === 'success' ? '成功' : type === 'error' ? '失敗' : type === 'warning' ? '提醒' : '通知'}
+                                </div>
+                                <div class="text-sm leading-6 ${cfg.text} whitespace-pre-wrap break-words">${message}</div>
+                            </div>
+                            <button class="toast-close shrink-0 text-gray-400 hover:text-gray-600 transition">
+                                <i class="fas fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+                    `;
+
+        toastContainer.appendChild(toast);
+
+        requestAnimationFrame(() => {
+                        toast.classList.remove('opacity-0', 'translate-y-[-8px]');
+        });
+
+        const removeToast = () => {
+                        toast.classList.add('opacity-0', 'translate-y-[-8px]');
+            setTimeout(() => toast.remove(), 220);
+        };
+
+                    toast.querySelector('.toast-close').addEventListener('click', removeToast);
+
+        if (duration > 0) {
+                        setTimeout(removeToast, duration);
+        }
+    }
+
         document.getElementById('register-form').addEventListener('submit', async function (e) {
-                e.preventDefault();
-                const keepYM = __CURRENT_MONTH_KEY;
+            e.preventDefault();
+            const keepYM = __CURRENT_MONTH_KEY;
 
-                const profileStr = localStorage.getItem('profile');
-                if (!profileStr) { alert('尚未登入'); return; }
-                const profile = JSON.parse(profileStr);
-                const userId = profile.id;
+            const profileStr = localStorage.getItem('profile');
+            if (!profileStr) {
+                showToast('尚未登入', 'warning');
+                return;
+        }
 
-                const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
-                const selectedIds = new Set(Array.from(checkboxes).map(cb => String(cb.value)));
+        const profile = JSON.parse(profileStr);
+        const userId = profile.id;
 
-                const monthIds = (__CURRENT_MONTH_DATE_IDS || []).map(String);
-                const monthIdSet = new Set(monthIds);
+        const checkboxes = document.querySelectorAll('input[name="dates"]:checked');
+        const selectedIds = new Set(Array.from(checkboxes).map(cb => String(cb.value)));
 
-                let existing = [];
-                if (monthIds.length > 0) {
-                    const { data, error } = await supabase
-                        .from('registrations')
-                        .select('id, match_date_id, description, registred_at')
-                        .eq('user_id', userId)
-                        .in('match_date_id', monthIds);
+        const monthIds = (__CURRENT_MONTH_DATE_IDS || []).map(String);
+        const monthIdSet = new Set(monthIds);
+
+        let existing = [];
+        if (monthIds.length > 0) {
+            const {data, error} = await supabase
+                    .from('registrations')
+                    .select('id, match_date_id, description, registred_at')
+                    .eq('user_id', userId)
+                    .in('match_date_id', monthIds);
 
                     if (error) {
                         console.error('❌ 載入本月舊報名失敗：', error);
-                        alert('更新失敗（讀取舊資料失敗）');
-                        return;
-                    }
+                    showToast('更新失敗（讀取舊資料失敗）', 'error', 4200);
+                    return;
+            }
                     existing = data || [];
-                }
+        }
 
-                const existingMap = new Map(existing.map(r => [String(r.match_date_id), r])); // key = match_date_id
+        const existingMap = new Map(existing.map(r => [String(r.match_date_id), r]));
 
-                const selectedWithNotes = [];
-                for (const id of selectedIds) {
-                    const noteInput = document.querySelector(`input[name="note-${id}"]`);
+        const selectedWithNotes = [];
+        for (const id of selectedIds) {
+            const noteInput = document.querySelector(`input[name="note-${id}"]`);
                     const note = noteInput ? noteInput.value.trim() : '';
-                    selectedWithNotes.push({ id: String(id), note });
-                }
+                    selectedWithNotes.push({id: String(id), note });
+        }
 
-                const toDelete = [];
-                for (const r of existing) {
-                    const id = String(r.match_date_id);
+        const toDelete = [];
+        for (const r of existing) {
+            const id = String(r.match_date_id);
                     if (!monthIdSet.has(id)) continue;
                     if (!selectedIds.has(id)) {
                         toDelete.push(id);
-                    }
-                }
+            }
+        }
 
-                const toInsert = [];
-                const toUpdate = [];
-                for (const { id, note } of selectedWithNotes) {
-                    if (!monthIdSet.has(id)) continue;
+        const toInsert = [];
+        const toUpdate = [];
+        for (const {id, note} of selectedWithNotes) {
+            if (!monthIdSet.has(id)) continue;
 
-                    const old = existingMap.get(id);
+            const old = existingMap.get(id);
                     if (!old) {
-                        // 原本沒有 -> 新增（寫 registred_at）
                         toInsert.push({
                             user_id: userId,
                             match_date_id: id,
                             description: note,
                             registred_at: new Date().toISOString()
                         });
-                    } else {
-                        // 原本有 -> 只有備註有變才 update（不動 registred_at）
-                        const oldNote = (old.description || '').trim();
-                        if (oldNote !== note) {
-                            toUpdate.push({ id, note });
-                        }
-                    }
+            } else {
+                const oldNote = (old.description || '').trim();
+                    if (oldNote !== note) {
+                        toUpdate.push({ id, note });
                 }
+            }
+        }
 
-                // delete
-                if (toDelete.length > 0) {
-                    const { error } = await supabase
-                        .from('registrations')
-                        .delete()
-                        .eq('user_id', userId)
-                        .in('match_date_id', toDelete);
+        if (toDelete.length > 0) {
+            const {error} = await supabase
+                    .from('registrations')
+                    .delete()
+                    .eq('user_id', userId)
+                    .in('match_date_id', toDelete);
 
                     if (error) {
                         console.error('❌ 刪除取消報名失敗：', error);
-                        alert('更新失敗（刪除失敗）');
-                        return;
-                    }
-                }
+                    showToast('更新失敗（刪除失敗）', 'error', 4200);
+                    return;
+            }
+        }
 
-                // update
-                if (toUpdate.length > 0) {
-                    const updates = await Promise.all(
-                        toUpdate.map(x =>
-                            supabase
-                                .from('registrations')
-                                .update({ description: x.note })
-                                .eq('user_id', userId)
-                                .eq('match_date_id', x.id)
-                        )
+        if (toUpdate.length > 0) {
+            const updates = await Promise.all(
+                toUpdate.map(x =>
+                    supabase
+                    .from('registrations')
+                    .update({description: x.note })
+                    .eq('user_id', userId)
+                    .eq('match_date_id', x.id)
+                    )
                     );
 
-                    const bad = updates.find(r => r.error);
+            const bad = updates.find(r => r.error);
                     if (bad && bad.error) {
                         console.error('❌ 更新備註失敗：', bad.error);
-                        alert('更新失敗（更新備註失敗）');
-                        return;
-                    }
-                }
+                    showToast('更新失敗（更新備註失敗）', 'error', 4200);
+                    return;
+            }
+        }
 
-                // insert
-                if (toInsert.length > 0) {
-                    const { error } = await supabase.from('registrations').insert(toInsert);
+        if (toInsert.length > 0) {
+            const {error} = await supabase.from('registrations').insert(toInsert);
                     if (error) {
                         console.error('❌ 新增報名失敗：', error);
-                        alert('更新失敗（新增失敗）');
-                        return;
-                    }
-                }
+                    showToast('更新失敗（新增失敗）', 'error', 4200);
+                    return;
+            }
+        }
 
-                alert('已更新本月份的報名！');
-                await loadMatchDates(keepYM);
-            });
+                    showToast('已更新本月份的報名！', 'success');
+                    await loadMatchDates(keepYM);
+    });
 
         document.addEventListener('DOMContentLoaded', () => {
             loadMatchDates();
