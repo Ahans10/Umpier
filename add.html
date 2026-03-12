@@ -101,430 +101,769 @@
 
     const contentArea = document.getElementById('content-area');
 
-    document.getElementById('btn-manage-games').addEventListener('click', async () => {
-            contentArea.innerHTML = `<h2 class="text-2xl font-bold mb-6 text-center">賽事管理</h2>
-            <form id="game-form" class="flex gap-3 items-end">
-                <div class="flex-1">
-                <label class="block font-semibold mb-2">賽事名稱</label>
-                <input id="game-name" type="text" placeholder="輸入賽事名稱"
-                        class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+    function ensureManageUi() {
+            let host = document.getElementById('global-manage-ui');
+        if (host) return;
+
+        host = document.createElement('div');
+        host.id = 'global-manage-ui';
+        host.innerHTML = `
+                <!-- 確認 Modal -->
+                <div id="manage-confirm-modal" class="fixed inset-0 z-[9999] hidden">
+                    <div id="manage-confirm-backdrop" class="absolute inset-0 bg-black/40"></div>
+
+                    <div class="absolute inset-0 flex items-center justify-center p-4">
+                        <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+                            <div class="px-6 py-4 border-b bg-red-50">
+                                <h4 id="manage-confirm-title" class="text-lg font-bold text-red-700">確認操作</h4>
+                            </div>
+
+                            <div class="px-6 py-5">
+                                <div class="flex items-start gap-3">
+                                    <div class="shrink-0 w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center">
+                                        <i class="fas fa-triangle-exclamation"></i>
+                                    </div>
+                                    <div class="min-w-0">
+                                        <p id="manage-confirm-lead" class="font-semibold text-gray-800 mb-2">你確定要執行這個操作嗎？</p>
+                                        <pre id="manage-confirm-text" class="whitespace-pre-wrap break-words text-sm text-gray-600 leading-6 font-sans"></pre>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+                                <button id="manage-confirm-cancel"
+                                    class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition">
+                                    取消
+                                </button>
+                                <button id="manage-confirm-ok"
+                                    class="px-4 py-2 rounded-lg bg-red-600 text-white hover:bg-red-700 transition">
+                                    確定
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">新增賽事</button>
-            </form>
-            <div id="games-list" class="pt-4"></div>`;
 
-            const gameForm = document.getElementById('game-form');
-            const gameNameInput = document.getElementById('game-name');
-            const gamesList = document.getElementById('games-list');
+                <!-- 輸入 Modal -->
+                <div id="manage-input-modal" class="fixed inset-0 z-[9999] hidden">
+                    <div id="manage-input-backdrop" class="absolute inset-0 bg-black/40"></div>
 
-            async function renderGamesList() {
-                const { data, error } = await supabase.from('games').select('id, name').order('name', { ascending: true });
-                if (error) { gamesList.innerHTML = `<p class="text-red-500">載入賽事失敗</p>`; return; }
-                if (!data || data.length === 0) { gamesList.innerHTML = `<p class="text-gray-600">目前尚無賽事。</p>`; return; }
+                    <div class="absolute inset-0 flex items-center justify-center p-4">
+                        <div class="w-full max-w-md bg-white rounded-2xl shadow-2xl overflow-hidden">
+                            <div class="px-6 py-4 border-b bg-blue-50">
+                                <h4 id="manage-input-title" class="text-lg font-bold text-blue-700">輸入資料</h4>
+                            </div>
+
+                            <div class="px-6 py-5">
+                                <div class="flex items-start gap-3 mb-4">
+                                    <div class="shrink-0 w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                                        <i class="fas fa-pen"></i>
+                                    </div>
+                                    <div class="min-w-0 w-full">
+                                        <p id="manage-input-label" class="font-semibold text-gray-800 mb-3">請輸入內容：</p>
+                                        <input id="manage-input-value" type="text"
+                                            class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                            placeholder="請輸入">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="px-6 py-4 bg-gray-50 flex justify-end gap-3">
+                                <button id="manage-input-cancel"
+                                    class="px-4 py-2 rounded-lg border border-gray-300 bg-white text-gray-700 hover:bg-gray-100 transition">
+                                    取消
+                                </button>
+                                <button id="manage-input-ok"
+                                    class="px-4 py-2 rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition">
+                                    確定
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Toast -->
+                <div id="manage-toast-container" class="fixed top-4 right-4 z-[10000] flex flex-col gap-3 pointer-events-none"></div>
+                `;
+        document.body.appendChild(host);
+    }
+
+    let manageConfirmResolver = null;
+    let manageInputResolver = null;
+
+    function showManageToast(message, type = 'info', duration = 2600) {
+        ensureManageUi();
+    const container = document.getElementById('manage-toast-container');
+
+    const styles = {
+        success: {
+                wrap: 'border-green-200 bg-green-50',
+                iconBg: 'bg-green-100 text-green-600',
+                title: 'text-green-800',
+                text: 'text-green-700',
+                icon: 'fa-check'
+            },
+        error: {
+                wrap: 'border-red-200 bg-red-50',
+                iconBg: 'bg-red-100 text-red-600',
+                title: 'text-red-800',
+                text: 'text-red-700',
+                icon: 'fa-circle-xmark'
+            },
+        warning: {
+                wrap: 'border-yellow-200 bg-yellow-50',
+                iconBg: 'bg-yellow-100 text-yellow-600',
+                title: 'text-yellow-800',
+                text: 'text-yellow-700',
+                icon: 'fa-triangle-exclamation'
+            },
+        info: {
+                wrap: 'border-blue-200 bg-blue-50',
+                iconBg: 'bg-blue-100 text-blue-600',
+                title: 'text-blue-800',
+                text: 'text-blue-700',
+                icon: 'fa-circle-info'
+            }
+        };
+
+        const cfg = styles[type] || styles.info;
+        const toast = document.createElement('div');
+        toast.className = `pointer-events-auto w-[320px] max-w-[calc(100vw-2rem)] rounded-2xl border shadow-xl ${cfg.wrap} overflow-hidden transition-all duration-300 opacity-0 translate-y-[-8px]`;
+
+        toast.innerHTML = `
+                <div class="p-4">
+                    <div class="flex items-start gap-3">
+                        <div class="shrink-0 w-10 h-10 rounded-full flex items-center justify-center ${cfg.iconBg}">
+                            <i class="fas ${cfg.icon}"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="font-semibold ${cfg.title} mb-1">
+                                ${type === 'success' ? '成功' : type === 'error' ? '失敗' : type === 'warning' ? '提醒' : '通知'}
+                            </div>
+                            <div class="text-sm leading-6 ${cfg.text} whitespace-pre-wrap break-words">${message}</div>
+                        </div>
+                        <button class="manage-toast-close shrink-0 text-gray-400 hover:text-gray-600 transition">
+                            <i class="fas fa-xmark"></i>
+                        </button>
+                    </div>
+                </div>
+                `;
+
+        container.appendChild(toast);
+
+        requestAnimationFrame(() => {
+                    toast.classList.remove('opacity-0', 'translate-y-[-8px]');
+        });
+
+        const removeToast = () => {
+                    toast.classList.add('opacity-0', 'translate-y-[-8px]');
+            setTimeout(() => toast.remove(), 220);
+        };
+
+                toast.querySelector('.manage-toast-close').addEventListener('click', removeToast);
+        if (duration > 0) setTimeout(removeToast, duration);
+    }
+
+    function showManageConfirm(message, opts = { }) {
+        ensureManageUi();
+            const titleEl = document.getElementById('manage-confirm-title');
+            const leadEl = document.getElementById('manage-confirm-lead');
+            const textEl = document.getElementById('manage-confirm-text');
+            const modal = document.getElementById('manage-confirm-modal');
+            const okBtn = document.getElementById('manage-confirm-ok');
+
+            titleEl.textContent = opts.title || '確認操作';
+            leadEl.textContent = opts.lead || '你確定要執行這個操作嗎？';
+            textEl.textContent = message || '';
+            okBtn.textContent = opts.okText || '確定';
+            modal.classList.remove('hidden');
+
+        return new Promise(resolve => {
+                    manageConfirmResolver = resolve;
+        });
+    }
+
+    function closeManageConfirm(result = false) {
+        const modal = document.getElementById('manage-confirm-modal');
+                if (modal) modal.classList.add('hidden');
+                if (manageConfirmResolver) {
+                    manageConfirmResolver(result);
+                manageConfirmResolver = null;
+        }
+    }
+
+    function showManageInput(opts = { }) {
+        ensureManageUi();
+        const modal = document.getElementById('manage-input-modal');
+        const titleEl = document.getElementById('manage-input-title');
+        const labelEl = document.getElementById('manage-input-label');
+        const inputEl = document.getElementById('manage-input-value');
+
+        titleEl.textContent = opts.title || '輸入資料';
+        labelEl.textContent = opts.label || '請輸入內容：';
+        inputEl.value = opts.value || '';
+        inputEl.placeholder = opts.placeholder || '請輸入';
+        modal.classList.remove('hidden');
+
+        setTimeout(() => {
+                    inputEl.focus();
+                inputEl.select();
+        }, 0);
+
+        return new Promise(resolve => {
+                    manageInputResolver = resolve;
+        });
+    }
+
+    function closeManageInput(result = null) {
+        const modal = document.getElementById('manage-input-modal');
+                if (modal) modal.classList.add('hidden');
+                if (manageInputResolver) {
+                    manageInputResolver(result);
+                manageInputResolver = null;
+        }
+    }
+
+    (function bindManageUiEventsOnce() {
+        ensureManageUi();
+            if (window.__manageUiBound) return;
+            window.__manageUiBound = true;
+
+        document.getElementById('manage-confirm-cancel').addEventListener('click', () => closeManageConfirm(false));
+        document.getElementById('manage-confirm-backdrop').addEventListener('click', () => closeManageConfirm(false));
+        document.getElementById('manage-confirm-ok').addEventListener('click', () => closeManageConfirm(true));
+
+        document.getElementById('manage-input-cancel').addEventListener('click', () => closeManageInput(null));
+        document.getElementById('manage-input-backdrop').addEventListener('click', () => closeManageInput(null));
+        document.getElementById('manage-input-ok').addEventListener('click', () => {
+                    closeManageInput(document.getElementById('manage-input-value').value);
+        });
+
+        document.getElementById('manage-input-value').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                    closeManageInput(document.getElementById('manage-input-value').value);
+            } else if (e.key === 'Escape') {
+                    closeManageInput(null);
+            }
+        });
+    })();
+
+    /* ==================== 賽事管理 ==================== */
+    document.getElementById('btn-manage-games').addEventListener('click', async () => {
+                    contentArea.innerHTML = `<h2 class="text-2xl font-bold mb-6 text-center">賽事管理</h2>
+                                                <form id="game-form" class="flex gap-3 items-end">
+                                                    <div class="flex-1">
+                                                        <label class="block font-semibold mb-2">賽事名稱</label>
+                                                        <input id="game-name" type="text" placeholder="輸入賽事名稱"
+                                                            class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                                                    </div>
+                                                    <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">新增賽事</button>
+                                                </form>
+                                                <div id="games-list" class="pt-4"></div>`;
+
+                const gameForm = document.getElementById('game-form');
+                const gameNameInput = document.getElementById('game-name');
+                const gamesList = document.getElementById('games-list');
+
+                async function renderGamesList() {
+            const {data, error} = await supabase.from('games').select('id, name').order('name', {ascending: true });
+                if (error) {gamesList.innerHTML = `<p class="text-red-500">載入賽事失敗</p>`; return; }
+                if (!data || data.length === 0) {gamesList.innerHTML = `<p class="text-gray-600">目前尚無賽事。</p>`; return; }
 
                 gamesList.innerHTML = `
-                <table class="w-full border border-blue-300 text-sm text-left">
-                    <thead class="bg-blue-100 text-blue-800">
-                    <tr>
-                        <th class="border px-4 py-2">賽事名稱</th>
-                        <th class="border px-4 py-2 w-32 text-center">操作</th>
-                    </tr>
-                    </thead>
-                    <tbody class="bg-white">
-                    ${data.map(g => `
-                        <tr>
-                        <td class="border px-4 py-2">${g.name}</td>
-                        <td class="border px-4 py-2 text-center">
-                            <div class="inline-flex items-center gap-2">
-                            <button data-id="${g.id}" data-name="${g.name}" class="btn-edit-game w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200" title="修改"><i class="fas fa-edit"></i></button>
-                            <button data-id="${g.id}" data-name="${g.name}" class="btn-del-game w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200" title="刪除"><i class="fas fa-trash-alt"></i></button>
-                            </div>
-                        </td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>`;
+                                <table class="w-full border border-blue-300 text-sm text-left">
+                                    <thead class="bg-blue-100 text-blue-800">
+                                        <tr>
+                                            <th class="border px-4 py-2">賽事名稱</th>
+                                            <th class="border px-4 py-2 w-32 text-center">操作</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white">
+                                        ${data.map(g => `
+                                        <tr>
+                                            <td class="border px-4 py-2">${g.name}</td>
+                                            <td class="border px-4 py-2 text-center">
+                                                <div class="inline-flex items-center gap-2">
+                                                    <button data-id="${g.id}" data-name="${g.name}" class="btn-edit-game w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200" title="修改"><i class="fas fa-edit"></i></button>
+                                                    <button data-id="${g.id}" data-name="${g.name}" class="btn-del-game w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200" title="刪除"><i class="fas fa-trash-alt"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>`).join('')}
+                                    </tbody>
+                                </table>`;
 
-                gamesList.querySelectorAll('.btn-edit-game').forEach(btn => {
+            gamesList.querySelectorAll('.btn-edit-game').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const id = btn.getAttribute('data-id');
                         const oldName = btn.getAttribute('data-name') || '';
-                        const raw = prompt('請輸入新的賽事名稱：', oldName);
+                        const raw = await showManageInput({
+                            title: '修改賽事',
+                            label: '請輸入新的賽事名稱：',
+                            value: oldName,
+                            placeholder: '請輸入賽事名稱'
+                        });
                         if (raw === null) return;
-                        const newName = raw.trim();
-                        if (!newName) return alert('賽事名稱不可空白');
-                        if (newName === oldName) return;
-                        const { error } = await supabase.from('games').update({ name: newName }).eq('id', id);
-                        if (error) alert('更新失敗');
-                        else { await renderGamesList(); alert('更新成功'); }
-                    });
-                });
 
-                gamesList.querySelectorAll('.btn-del-game').forEach(btn => {
+                        const newName = raw.trim();
+                        if (!newName) {
+                            showManageToast('賽事名稱不可空白', 'warning');
+                            return;
+                        }
+                        if (newName === oldName) return;
+
+                        const { error } = await supabase.from('games').update({ name: newName }).eq('id', id);
+                        if (error) showManageToast('更新失敗', 'error');
+                        else {
+                            await renderGamesList();
+                            showManageToast('更新成功', 'success');
+                        }
+                    });
+            });
+
+            gamesList.querySelectorAll('.btn-del-game').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const id = btn.getAttribute('data-id');
                         const name = btn.getAttribute('data-name') || '';
-                        if (!confirm(`確定要刪除賽事「${name}」？\n（將一併刪除此賽事的所有參賽隊伍）\n此操作無法復原。`)) return;
+
+                        const ok = await showManageConfirm(
+                            `賽事名稱：${name}\n（將一併刪除此賽事的所有參賽隊伍）\n此操作無法復原。`,
+                            {
+                                title: '確認刪除',
+                                lead: '你確定要刪除這個賽事嗎？',
+                                okText: '確定刪除'
+                            }
+                        );
+                        if (!ok) return;
 
                         const { error: delTeamsErr } = await supabase.from('teams').delete().eq('games_id', id);
                         if (delTeamsErr) {
                             console.error('[刪除隊伍失敗]', delTeamsErr);
-                            alert('刪除失敗：參賽隊伍無法刪除，請先確認無關聯限制或稍後再試。');
+                            showManageToast('刪除失敗：參賽隊伍無法刪除，請先確認無關聯限制或稍後再試。', 'error', 4200);
                             return;
                         }
 
                         const { error: delGameErr } = await supabase.from('games').delete().eq('id', id);
                         if (delGameErr) {
                             console.error('[刪除賽事失敗]', delGameErr);
-                            alert('刪除失敗：賽事無法刪除，請稍後再試。');
+                            showManageToast('刪除失敗：賽事無法刪除，請稍後再試。', 'error', 4200);
                             return;
                         }
 
                         await renderGamesList();
-                        alert('刪除成功');
+                        showManageToast('刪除成功', 'success');
                     });
-                });
+            });
+        }
+
+        gameForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                const name = gameNameInput.value.trim();
+                if (!name) {
+                    showManageToast('請輸入賽事名稱', 'warning');
+                return;
             }
 
-            gameForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const name = gameNameInput.value.trim();
-                if (!name) return alert('請輸入賽事名稱');
-                const { error } = await supabase.from('games').insert({ name });
-                if (error) alert('新增失敗');
-                else { gameNameInput.value = ''; await renderGamesList(); }
-            });
-
-            renderGamesList();
+                const {error} = await supabase.from('games').insert({name});
+                if (error) showManageToast('新增失敗', 'error');
+                else {
+                    gameNameInput.value = '';
+                await renderGamesList();
+                showManageToast('新增成功', 'success');
+            }
         });
 
+                renderGamesList();
+    });
+
+    /* ==================== 比賽日期管理 ==================== */
     document.getElementById('btn-manage-dates').addEventListener('click', async () => {
-            contentArea.innerHTML = `
-                                    <h2 class="text-2xl font-bold mb-6 text-center">比賽日期管理</h2>
+                    contentArea.innerHTML = `
+                            <h2 class="text-2xl font-bold mb-6 text-center">比賽日期管理</h2>
 
-                                    <form id="date-form" class="flex flex-wrap gap-4 items-end">
-                                    <div>
-                                        <label class="block font-semibold mb-2">日期</label>
-                                        <input id="match-date" type="date"
-                                            class="px-4 py-2 border rounded-lg bg-white text-blue-900" />
-                                    </div>
+                            <form id="date-form" class="flex flex-wrap gap-4 items-end">
+                                <div>
+                                    <label class="block font-semibold mb-2">日期</label>
+                                    <input id="match-date" type="date"
+                                        class="px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                                </div>
 
-                                    <label class="inline-flex items-center gap-2 mb-2">
-                                        <input id="chk-private" type="checkbox" class="w-5 h-5 accent-blue-600" />
-                                        <span class="font-semibold text-blue-900">不公開（僅管理員可見）</span>
-                                    </label>
+                                <label class="inline-flex items-center gap-2 mb-2">
+                                    <input id="chk-private" type="checkbox" class="w-5 h-5 accent-blue-600" />
+                                    <span class="font-semibold text-blue-900">不公開（僅管理員可見）</span>
+                                </label>
 
-                                    <button type="submit"
-                                            class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                                        新增日期
-                                    </button>
-                                    </form>
+                                <button type="submit"
+                                        class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                                    新增日期
+                                </button>
+                            </form>
 
-                                    <div id="dates-list" class="pt-4"></div>
-                                `;
+                            <div id="dates-list" class="pt-4"></div>
+                        `;
 
-            const dateForm = document.getElementById('date-form');
-            const dateInput = document.getElementById('match-date');
-            const chkPrivate = document.getElementById('chk-private');
-            const datesList = document.getElementById('dates-list');
+                const dateForm = document.getElementById('date-form');
+                const dateInput = document.getElementById('match-date');
+                const chkPrivate = document.getElementById('chk-private');
+                const datesList = document.getElementById('dates-list');
 
-            async function renderDatesList() {
-                const { data, error } = await supabase
-                    .from('match_dates')
-                    .select('id, date, is_public')
-                    .order('date', { ascending: true });
+        async function renderDatesList() {
+            const {data, error} = await supabase
+                .from('match_dates')
+                .select('id, date, is_public')
+                .order('date', {ascending: true });
 
-                if (error) { datesList.innerHTML = `<p class="text-red-500">載入日期失敗</p>`; return; }
-                if (!data || data.length === 0) { datesList.innerHTML = `<p class="text-gray-600">目前尚無比賽日期。</p>`; return; }
+                if (error) {datesList.innerHTML = `<p class="text-red-500">載入日期失敗</p>`; return; }
+                if (!data || data.length === 0) {datesList.innerHTML = `<p class="text-gray-600">目前尚無比賽日期。</p>`; return; }
 
                 datesList.innerHTML = `
-                                        <table class="w-full border border-blue-300 text-sm text-left">
-                                            <thead class="bg-blue-100 text-blue-800">
+                            <table class="w-full border border-blue-300 text-sm text-left">
+                                <thead class="bg-blue-100 text-blue-800">
+                                    <tr>
+                                        <th class="border px-4 py-2">日期</th>
+                                        <th class="border px-4 py-2 text-center w-28">可見性</th>
+                                        <th class="border px-4 py-2 w-56 text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white">
+                                    ${data.map(d => {
+                                        const dstr = new Date(d.date).toLocaleDateString('zh-TW', {
+                                            year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
+                                        });
+                                        const isPublic = d.is_public !== false;
+                                        const badge = isPublic
+                                            ? `<span class="inline-flex items-center rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-semibold">公開</span>`
+                                            : `<span class="inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-xs font-semibold">不公開</span>`;
+                                        const toggleText = isPublic ? '設為不公開' : '設為公開';
+                                        const toggleColor = isPublic ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-teal-100 text-teal-700 hover:bg-teal-200';
+
+                                        return `
                                             <tr>
-                                                <th class="border px-4 py-2">日期</th>
-                                                <th class="border px-4 py-2 text-center w-28">可見性</th>
-                                                <th class="border px-4 py-2 w-56 text-center">操作</th>
+                                                <td class="border px-4 py-2">${dstr}</td>
+                                                <td class="border px-4 py-2 text-center">${badge}</td>
+                                                <td class="border px-4 py-2 text-center">
+                                                    <div class="inline-flex items-center gap-2">
+                                                        <button data-id="${d.id}" data-date="${d.date}"
+                                                                class="btn-edit-date w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                                                title="修改日期"><i class="fas fa-edit"></i></button>
+
+                                                        <button data-id="${d.id}" data-public="${isPublic ? '1' : '0'}"
+                                                                class="btn-toggle-public px-3 py-1 rounded ${toggleColor}"
+                                                                title="${toggleText}">${toggleText}</button>
+
+                                                        <button data-id="${d.id}" data-date="${d.date}"
+                                                                class="btn-del-date w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
+                                                                title="刪除"><i class="fas fa-trash-alt"></i></button>
+                                                    </div>
+                                                </td>
                                             </tr>
-                                            </thead>
-                                            <tbody class="bg-white">
-        ${data.map(d => {
-                    const dstr = new Date(d.date).toLocaleDateString('zh-TW', {
-                        year: 'numeric', month: '2-digit', day: '2-digit', weekday: 'short'
-                    });
-                    const isPublic = d.is_public !== false; // 預設視為公開
-                    const badge = isPublic
-                        ? `<span class="inline-flex items-center rounded-full bg-green-100 text-green-700 px-2 py-0.5 text-xs font-semibold">公開</span>`
-                        : `<span class="inline-flex items-center rounded-full bg-red-100 text-red-700 px-2 py-0.5 text-xs font-semibold">不公開</span>`;
-                    const toggleText = isPublic ? '設為不公開' : '設為公開';
-                    const toggleColor = isPublic ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-teal-100 text-teal-700 hover:bg-teal-200';
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                            `;
 
-                    return `
-                        <tr>
-                            <td class="border px-4 py-2">${dstr}</td>
-                            <td class="border px-4 py-2 text-center">${badge}</td>
-                            <td class="border px-4 py-2 text-center">
-                            <div class="inline-flex items-center gap-2">
-                                <button data-id="${d.id}" data-date="${d.date}"
-                                        class="btn-edit-date w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                        title="修改日期"><i class="fas fa-edit"></i></button>
-
-                                <button data-id="${d.id}" data-public="${isPublic ? '1' : '0'}"
-                                        class="btn-toggle-public px-3 py-1 rounded ${toggleColor}"
-                                        title="${toggleText}">${toggleText}</button>
-
-                                <button data-id="${d.id}" data-date="${d.date}"
-                                        class="btn-del-date w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
-                                        title="刪除"><i class="fas fa-trash-alt"></i></button>
-                            </div>
-                            </td>
-                        </tr>
-                        `;
-                            }).join('')}
-                    </tbody>
-                </table>
-                `;
-
-                datesList.querySelectorAll('.btn-edit-date').forEach(btn => {
+            datesList.querySelectorAll('.btn-edit-date').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const id = btn.getAttribute('data-id');
                         const oldDate = (btn.getAttribute('data-date') || '').slice(0, 10);
-                        const raw = prompt('請輸入新的日期（格式：YYYY-MM-DD）：', oldDate);
-                        if (raw === null) return;
-                        const newDate = raw.trim();
-                        if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(newDate)) return alert('格式錯誤，請使用 YYYY-MM-DD');
-                        const { error } = await supabase.from('match_dates').update({ date: newDate }).eq('id', id);
-                        if (error) alert('更新失敗');
-                        else { alert('更新成功'); renderDatesList(); }
-                    });
-                });
 
-                datesList.querySelectorAll('.btn-toggle-public').forEach(btn => {
+                        const raw = await showManageInput({
+                            title: '修改日期',
+                            label: '請輸入新的日期（格式：YYYY-MM-DD）：',
+                            value: oldDate,
+                            placeholder: 'YYYY-MM-DD'
+                        });
+                        if (raw === null) return;
+
+                        const newDate = raw.trim();
+                        if (!/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/.test(newDate)) {
+                            showManageToast('格式錯誤，請使用 YYYY-MM-DD', 'warning');
+                            return;
+                        }
+
+                        const { error } = await supabase.from('match_dates').update({ date: newDate }).eq('id', id);
+                        if (error) showManageToast('更新失敗', 'error');
+                        else {
+                            showManageToast('更新成功', 'success');
+                            renderDatesList();
+                        }
+                    });
+            });
+
+            datesList.querySelectorAll('.btn-toggle-public').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const id = btn.getAttribute('data-id');
                         const isPublicNow = btn.getAttribute('data-public') === '1';
                         const toPublic = !isPublicNow;
-                        const msg = toPublic ? '確定設為【公開】？' : '確定設為【不公開】（僅管理員可見）？';
-                        if (!confirm(msg)) return;
+                        const msg = toPublic ? '將此日期設為【公開】。' : '將此日期設為【不公開】（僅管理員可見）。';
+
+                        const ok = await showManageConfirm(msg, {
+                            title: '確認切換',
+                            lead: toPublic ? '你確定要設為公開嗎？' : '你確定要設為不公開嗎？',
+                            okText: '確定'
+                        });
+                        if (!ok) return;
 
                         const { error } = await supabase
                             .from('match_dates')
                             .update({ is_public: toPublic })
                             .eq('id', id);
 
-                        if (error) alert('切換失敗');
-                        else renderDatesList();
+                        if (error) showManageToast('切換失敗', 'error');
+                        else {
+                            renderDatesList();
+                            showManageToast('切換成功', 'success');
+                        }
                     });
-                });
+            });
 
-                datesList.querySelectorAll('.btn-del-date').forEach(btn => {
+            datesList.querySelectorAll('.btn-del-date').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const id = btn.getAttribute('data-id');
                         const label = btn.getAttribute('data-label') || btn.getAttribute('data-date') || '';
-                        if (!confirm(`確定要刪除日期「${label.slice(0, 10)}」的所有賽程？此操作無法復原。`)) return;
+
+                        const ok = await showManageConfirm(
+                            `日期：${label.slice(0, 10)}\n此日期底下的所有賽程都會被刪除。\n此操作無法復原。`,
+                            {
+                                title: '確認刪除',
+                                lead: '你確定要刪除這個日期嗎？',
+                                okText: '確定刪除'
+                            }
+                        );
+                        if (!ok) return;
 
                         const { error: delMatchesErr } = await supabase.from('matches').delete().eq('match_dates_id', id);
                         if (delMatchesErr) {
                             console.error(delMatchesErr);
-                            alert('刪除賽事失敗，請稍後再試');
+                            showManageToast('刪除賽事失敗，請稍後再試', 'error');
+                            return;
                         }
-                        const { error } = await supabase.from('match_dates').delete().eq('id', id);
-                        if (error) alert('刪除日期失敗');
-                        else renderDatesList();
-                    });
-                });
-            }
 
-            dateForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
+                        const { error } = await supabase.from('match_dates').delete().eq('id', id);
+                        if (error) showManageToast('刪除日期失敗', 'error');
+                        else {
+                            renderDatesList();
+                            showManageToast('刪除成功', 'success');
+                        }
+                    });
+            });
+        }
+
+        dateForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
                 const dateVal = dateInput.value;
-                if (!dateVal) return alert('請選擇日期');
+                if (!dateVal) {
+                    showManageToast('請選擇日期', 'warning');
+                return;
+            }
 
                 const is_public = !chkPrivate.checked;
-                const { error } = await supabase.from('match_dates').insert({ date: dateVal, is_public });
-                if (error) alert('新增失敗');
+                const {error} = await supabase.from('match_dates').insert({date: dateVal, is_public });
+                if (error) showManageToast('新增失敗', 'error');
                 else {
                     dateInput.value = '';
-                    chkPrivate.checked = false;
-                    await renderDatesList();
-                    alert('新增成功');
-                }
-            });
-
-            renderDatesList();
+                chkPrivate.checked = false;
+                await renderDatesList();
+                showManageToast('新增成功', 'success');
+            }
         });
-        
+
+                renderDatesList();
+    });
+
+    /* ==================== 隊伍管理 ==================== */
     document.getElementById('btn-manage-teams').addEventListener('click', async () => {
-            contentArea.innerHTML = `
-                <h2 class="text-2xl font-bold mb-6 text-center">新增賽事隊伍</h2>
+                    contentArea.innerHTML = `
+                        <h2 class="text-2xl font-bold mb-6 text-center">新增賽事隊伍</h2>
 
-                <div class="space-y-6">
-                <div>
-                    <label class="block font-semibold mb-2">選擇賽事</label>
-                    <select id="games-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
-                    <option value="">載入中...</option>
-                    </select>
-                </div>
+                        <div class="space-y-6">
+                            <div>
+                                <label class="block font-semibold mb-2">選擇賽事</label>
+                                <select id="games-select" class="w-full border border-blue-300 rounded-lg px-4 py-2 bg-white text-blue-900">
+                                    <option value="">載入中...</option>
+                                </select>
+                            </div>
 
-                <form id="team-form" class="space-y-4">
-                    <div>
-                    <label class="block font-semibold mb-2">隊伍名稱</label>
-                    <input id="team-name" type="text" placeholder="請輸入隊伍名稱"
-                            class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
-                    </div>
+                            <form id="team-form" class="space-y-4">
+                                <div>
+                                    <label class="block font-semibold mb-2">隊伍名稱</label>
+                                    <input id="team-name" type="text" placeholder="請輸入隊伍名稱"
+                                        class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                                </div>
 
-                    <div class="text-right">
-                    <button type="submit"
-                            class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
-                        送出新增
-                    </button>
-                    </div>
-                </form>
+                                <div class="text-right">
+                                    <button type="submit"
+                                        class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+                                        送出新增
+                                    </button>
+                                </div>
+                            </form>
 
-                <div id="teams-list" class="pt-4 border-t border-blue-200"></div>
-                </div>
-            `;
+                            <div id="teams-list" class="pt-4 border-t border-blue-200"></div>
+                        </div>
+                    `;
 
-            const gamesSelect = document.getElementById('games-select');
-            const teamForm = document.getElementById('team-form');
-            const teamNameInput = document.getElementById('team-name');
-            const teamsList = document.getElementById('teams-list');
+                const gamesSelect = document.getElementById('games-select');
+                const teamForm = document.getElementById('team-form');
+                const teamNameInput = document.getElementById('team-name');
+                const teamsList = document.getElementById('teams-list');
 
-            const { data: games, error: gamesErr } = await supabase
+                const {data: games, error: gamesErr } = await supabase
                 .from('games')
                 .select('*')
-                .order('name', { ascending: true });
+                .order('name', {ascending: true });
 
-            if (gamesErr) {
-                gamesSelect.innerHTML = `<option value="">載入賽事失敗</option>`;
+                if (gamesErr) {
+                    gamesSelect.innerHTML = `<option value="">載入賽事失敗</option>`;
                 console.error(gamesErr);
-            } else {
-                gamesSelect.innerHTML = `<option value="">請選擇賽事</option>` +
+        } else {
+                    gamesSelect.innerHTML = `<option value="">請選擇賽事</option>` +
                     games.map(g => `<option value="${g.id}">${g.name}</option>`).join('');
-            }
+        }
 
-            gamesSelect.addEventListener('change', () => {
-                renderTeamsList(gamesSelect.value);
-            });
+        gamesSelect.addEventListener('change', () => {
+                    renderTeamsList(gamesSelect.value);
+        });
 
-            teamForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
+        teamForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
                 const gamesId = gamesSelect.value;
                 const name = (teamNameInput.value || '').trim();
 
                 if (!gamesId) {
-                    alert('請先選擇賽事');
-                    return;
-                }
+                    showManageToast('請先選擇賽事', 'warning');
+                return;
+            }
                 if (!name) {
-                    alert('請輸入隊伍名稱');
-                    return;
-                }
+                    showManageToast('請輸入隊伍名稱', 'warning');
+                return;
+            }
 
-                const { data: dup, error: dupErr } = await supabase
-                    .from('teams')
-                    .select('id')
-                    .eq('games_id', gamesId)
-                    .ilike('name', name);
+                const {data: dup, error: dupErr } = await supabase
+                .from('teams')
+                .select('id')
+                .eq('games_id', gamesId)
+                .ilike('name', name);
 
-                if (!dupErr && dup && dup.length > 0) {
-                    alert('此賽事已存在相同隊名，請確認。');
-                    return;
-                }
+            if (!dupErr && dup && dup.length > 0) {
+                    showManageToast('此賽事已存在相同隊名，請確認。', 'warning');
+                return;
+            }
 
-                const { error: insertErr } = await supabase.from('teams').insert({
+                const {error: insertErr } = await supabase.from('teams').insert({
                     games_id: gamesId,
-                    name: name
-                });
-
-                if (insertErr) {
-                    alert('新增失敗，請稍後再試');
-                    console.error(insertErr);
-                } else {
-                    alert('新增成功');
-                    teamNameInput.value = '';
-                    renderTeamsList(gamesId);
-                }
+                name: name
             });
 
-            async function renderTeamsList(gamesId) {
-                if (!gamesId) {
+                if (insertErr) {
+                    showManageToast('新增失敗，請稍後再試', 'error');
+                console.error(insertErr);
+            } else {
+                    showManageToast('新增成功', 'success');
+                teamNameInput.value = '';
+                renderTeamsList(gamesId);
+            }
+        });
+
+        async function renderTeamsList(gamesId) {
+            if (!gamesId) {
                     teamsList.innerHTML = '';
-                    return;
-                }
-                const { data, error } = await supabase
-                    .from('teams')
-                    .select('id, name')
-                    .eq('games_id', gamesId)
-                    .order('name', { ascending: true });
+                return;
+            }
+
+                const {data, error} = await supabase
+                .from('teams')
+                .select('id, name')
+                .eq('games_id', gamesId)
+                .order('name', {ascending: true });
 
                 if (error) {
                     teamsList.innerHTML = `<p class="text-red-500">載入隊伍失敗</p>`;
-                    console.error(error);
-                    return;
-                }
+                console.error(error);
+                return;
+            }
 
                 if (!data || data.length === 0) {
                     teamsList.innerHTML = `<p class="text-gray-600">目前此賽事尚無參賽隊伍。</p>`;
-                    return;
-                }
+                return;
+            }
 
                 teamsList.innerHTML = `
-                    <h3 class="text-lg font-bold mb-3">已報名隊伍</h3>
-                    <table class="w-full border border-blue-300 text-sm text-left">
-                    <thead class="bg-blue-100 text-blue-800">
-                        <tr>
-                        <th class="border px-4 py-2">隊伍名稱</th>
-                        <th class="border px-4 py-2 w-32 text-center">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody class="bg-white">
-                        ${data.map(t => `
-                        <tr>
-                            <td class="border px-4 py-2">${t.name}</td>
-                            <td class="border px-4 py-2 text-center">
-                            <div class="inline-flex items-center gap-2">
-                                <button data-id="${t.id}" data-name="${t.name}"
-                                        class="btn-edit-team inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
-                                        title="修改">
-                                <i class="fas fa-edit"></i>
-                                </button>
-                                <button data-id="${t.id}" data-name="${t.name}"
-                                        class="btn-del-team inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
-                                        title="刪除">
-                                <i class="fas fa-trash-alt"></i>
-                                </button>
-                            </div>
-                            </td>
-                        </tr>
-                        `).join('')}
-                    </tbody>
-                    </table>
-                `;
+                            <h3 class="text-lg font-bold mb-3">已報名隊伍</h3>
+                            <table class="w-full border border-blue-300 text-sm text-left">
+                                <thead class="bg-blue-100 text-blue-800">
+                                    <tr>
+                                        <th class="border px-4 py-2">隊伍名稱</th>
+                                        <th class="border px-4 py-2 w-32 text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white">
+                                    ${data.map(t => `
+                                    <tr>
+                                        <td class="border px-4 py-2">${t.name}</td>
+                                        <td class="border px-4 py-2 text-center">
+                                            <div class="inline-flex items-center gap-2">
+                                                <button data-id="${t.id}" data-name="${t.name}"
+                                                    class="btn-edit-team inline-flex items-center justify-center w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200"
+                                                    title="修改">
+                                                    <i class="fas fa-edit"></i>
+                                                </button>
+                                                <button data-id="${t.id}" data-name="${t.name}"
+                                                    class="btn-del-team inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200"
+                                                    title="刪除">
+                                                    <i class="fas fa-trash-alt"></i>
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                            `;
 
-                document.querySelectorAll('.btn-del-team').forEach(btn => {
+            teamsList.querySelectorAll('.btn-del-team').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const id = btn.getAttribute('data-id');
                         const name = btn.getAttribute('data-name') || '';
-                        if (!confirm(`確定刪除隊伍「${name}」？此操作無法復原。`)) return;
+
+                        const ok = await showManageConfirm(
+                            `隊伍名稱：${name}\n此操作無法復原。`,
+                            {
+                                title: '確認刪除',
+                                lead: '你確定要刪除這支隊伍嗎？',
+                                okText: '確定刪除'
+                            }
+                        );
+                        if (!ok) return;
+
                         const { error: delErr } = await supabase.from('teams').delete().eq('id', id);
                         if (delErr) {
-                            alert('刪除失敗，請稍後再試');
+                            showManageToast('刪除失敗，請稍後再試', 'error');
                             console.error(delErr);
                         } else {
+                            showManageToast('刪除成功', 'success');
                             renderTeamsList(gamesId);
                         }
                     });
-                });
+            });
 
-                document.querySelectorAll('.btn-edit-team').forEach(btn => {
+            teamsList.querySelectorAll('.btn-edit-team').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const id = btn.getAttribute('data-id');
                         const oldName = btn.getAttribute('data-name') || '';
-                        const newNameRaw = prompt('請輸入新的隊伍名稱：', oldName);
-                        const newName = (newNameRaw || '').trim();
 
-                        if (newName === null) return;
+                        const newNameRaw = await showManageInput({
+                            title: '修改隊伍',
+                            label: '請輸入新的隊伍名稱：',
+                            value: oldName,
+                            placeholder: '請輸入隊伍名稱'
+                        });
+
+                        if (newNameRaw === null) return;
+
+                        const newName = newNameRaw.trim();
                         if (!newName) {
-                            alert('隊伍名稱不可為空白');
+                            showManageToast('隊伍名稱不可為空白', 'warning');
                             return;
                         }
                         if (newName === oldName) return;
@@ -536,7 +875,7 @@
                             .ilike('name', newName);
 
                         if (!dupErr && dup && dup.length > 0) {
-                            alert('此賽事已存在相同隊名，請確認。');
+                            showManageToast('此賽事已存在相同隊名，請確認。', 'warning');
                             return;
                         }
 
@@ -546,107 +885,147 @@
                             .eq('id', id);
 
                         if (updErr) {
-                            alert('更新失敗，請稍後再試');
+                            showManageToast('更新失敗，請稍後再試', 'error');
                             console.error(updErr);
                         } else {
-                            alert('更新成功');
+                            showManageToast('更新成功', 'success');
                             renderTeamsList(gamesId);
                         }
                     });
-                });
-            }
-        });
+            });
+        }
+    });
 
+    /* ==================== 地點管理 ==================== */
     document.getElementById('btn-manage-locations').addEventListener('click', async () => {
-        contentArea.innerHTML = `
-            <h2 class="text-2xl font-bold mb-6 text-center">比賽地點管理</h2>
-            <form id="loc-form" class="flex gap-3 items-end">
-            <div class="flex-1">
-                <label class="block font-semibold mb-2">地點名稱</label>
-                <input id="loc-name" type="text" placeholder="輸入地點名稱"
-                    class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
-            </div>
-            <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">新增地點</button>
-            </form>
-            <div id="loc-list" class="pt-4"></div>`;
+                contentArea.innerHTML = `
+                            <h2 class="text-2xl font-bold mb-6 text-center">比賽地點管理</h2>
+                            <form id="loc-form" class="flex gap-3 items-end">
+                                <div class="flex-1">
+                                    <label class="block font-semibold mb-2">地點名稱</label>
+                                    <input id="loc-name" type="text" placeholder="輸入地點名稱"
+                                        class="w-full px-4 py-2 border rounded-lg bg-white text-blue-900" />
+                                </div>
+                                <button type="submit" class="px-6 py-2 bg-green-600 text-white rounded hover:bg-green-700">新增地點</button>
+                            </form>
+                            <div id="loc-list" class="pt-4"></div>`;
 
-            const locForm = document.getElementById('loc-form');
-            const locNameInput = document.getElementById('loc-name');
-            const locList = document.getElementById('loc-list');
+                const locForm = document.getElementById('loc-form');
+                const locNameInput = document.getElementById('loc-name');
+                const locList = document.getElementById('loc-list');
 
-            async function renderLocationsList() {
-                const { data, error } = await supabase.from('locations').select('id, name').order('name', { ascending: true });
-                if (error) { locList.innerHTML = `<p class="text-red-500">載入地點失敗</p>`; console.error(error); return; }
-                if (!data || data.length === 0) { locList.innerHTML = `<p class="text-gray-600">目前尚無地點。</p>`; return; }
+                async function renderLocationsList() {
+            const {data, error} = await supabase.from('locations').select('id, name').order('name', {ascending: true });
+                if (error) {locList.innerHTML = `<p class="text-red-500">載入地點失敗</p>`; console.error(error); return; }
+                if (!data || data.length === 0) {locList.innerHTML = `<p class="text-gray-600">目前尚無地點。</p>`; return; }
 
                 locList.innerHTML = `
-                    <table class="w-full border border-blue-300 text-sm text-left">
-                        <thead class="bg-blue-100 text-blue-800">
-                        <tr>
-                            <th class="border px-4 py-2">地點名稱</th>
-                            <th class="border px-4 py-2 w-32 text-center">操作</th>
-                        </tr>
-                        </thead>
-                        <tbody class="bg-white">
-                        ${data.map(l => `
-                            <tr>
-                            <td class="border px-4 py-2">${l.name}</td>
-                            <td class="border px-4 py-2 text-center">
-                                <div class="inline-flex items-center gap-2">
-                                <button data-id="${l.id}" data-name="${l.name}" class="btn-edit-loc w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200" title="修改"><i class="fas fa-edit"></i></button>
-                                <button data-id="${l.id}" data-name="${l.name}" class="btn-del-loc w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200" title="刪除"><i class="fas fa-trash-alt"></i></button>
-                                </div>
-                            </td>
-                            </tr>`).join('')}
-                        </tbody>
-                    </table>`;
+                            <table class="w-full border border-blue-300 text-sm text-left">
+                                <thead class="bg-blue-100 text-blue-800">
+                                    <tr>
+                                        <th class="border px-4 py-2">地點名稱</th>
+                                        <th class="border px-4 py-2 w-32 text-center">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white">
+                                    ${data.map(l => `
+                                        <tr>
+                                            <td class="border px-4 py-2">${l.name}</td>
+                                            <td class="border px-4 py-2 text-center">
+                                                <div class="inline-flex items-center gap-2">
+                                                    <button data-id="${l.id}" data-name="${l.name}" class="btn-edit-loc w-8 h-8 rounded-full bg-blue-100 text-blue-700 hover:bg-blue-200" title="修改"><i class="fas fa-edit"></i></button>
+                                                    <button data-id="${l.id}" data-name="${l.name}" class="btn-del-loc w-8 h-8 rounded-full bg-red-100 text-red-700 hover:bg-red-200" title="刪除"><i class="fas fa-trash-alt"></i></button>
+                                                </div>
+                                            </td>
+                                        </tr>`).join('')}
+                                </tbody>
+                            </table>`;
 
-                locList.querySelectorAll('.btn-edit-loc').forEach(btn => {
+            locList.querySelectorAll('.btn-edit-loc').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const id = btn.getAttribute('data-id');
                         const oldName = btn.getAttribute('data-name') || '';
-                        const raw = prompt('請輸入新的地點名稱：', oldName);
-                        if (raw === null) return;
-                        const newName = raw.trim();
-                        if (!newName) return alert('地點名稱不可空白');
-                        if (newName === oldName) return;
-                        const { error } = await supabase.from('locations').update({ name: newName }).eq('id', id);
-                        if (error) { alert('更新失敗'); console.error(error); }
-                        else { alert('更新成功'); renderLocationsList(); }
-                    });
-                });
 
-                locList.querySelectorAll('.btn-del-loc').forEach(btn => {
+                        const raw = await showManageInput({
+                            title: '修改地點',
+                            label: '請輸入新的地點名稱：',
+                            value: oldName,
+                            placeholder: '請輸入地點名稱'
+                        });
+                        if (raw === null) return;
+
+                        const newName = raw.trim();
+                        if (!newName) {
+                            showManageToast('地點名稱不可空白', 'warning');
+                            return;
+                        }
+                        if (newName === oldName) return;
+
+                        const { error } = await supabase.from('locations').update({ name: newName }).eq('id', id);
+                        if (error) {
+                            showManageToast('更新失敗', 'error');
+                            console.error(error);
+                        } else {
+                            showManageToast('更新成功', 'success');
+                            renderLocationsList();
+                        }
+                    });
+            });
+
+            locList.querySelectorAll('.btn-del-loc').forEach(btn => {
                     btn.addEventListener('click', async () => {
                         const id = btn.getAttribute('data-id');
                         const name = btn.getAttribute('data-name') || '';
-                        if (!confirm(`確定刪除地點「${name}」？此操作無法復原。`)) return;
+
+                        const ok = await showManageConfirm(
+                            `地點名稱：${name}\n此操作無法復原。`,
+                            {
+                                title: '確認刪除',
+                                lead: '你確定要刪除這個地點嗎？',
+                                okText: '確定刪除'
+                            }
+                        );
+                        if (!ok) return;
+
                         const { error } = await supabase.from('locations').delete().eq('id', id);
-                        if (error) { alert('刪除失敗'); console.error(error); }
-                        else { renderLocationsList(); }
+                        if (error) {
+                            showManageToast('刪除失敗', 'error');
+                            console.error(error);
+                        } else {
+                            renderLocationsList();
+                            showManageToast('刪除成功', 'success');
+                        }
                     });
-                });
+            });
+        }
+
+        locForm.addEventListener('submit', async (e) => {
+                    e.preventDefault();
+                const name = locNameInput.value.trim();
+                if (!name) {
+                    showManageToast('請輸入地點名稱', 'warning');
+                return;
             }
 
-            locForm.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const name = locNameInput.value.trim();
-                if (!name) return alert('請輸入地點名稱');
+                const {data: dup, error: dupErr } = await supabase.from('locations').select('id').ilike('name', name);
+            if (!dupErr && dup && dup.length > 0) {
+                    showManageToast('已有相同地點名稱', 'warning');
+                return;
+            }
 
-                const { data: dup, error: dupErr } = await supabase.from('locations').select('id').ilike('name', name);
-                if (!dupErr && dup && dup.length > 0) return alert('已有相同地點名稱');
-
-                const { error } = await supabase.from('locations').insert({ name });
-                if (error) { alert('新增失敗'); console.error(error); }
-                else {
+                const {error} = await supabase.from('locations').insert({name});
+                if (error) {
+                    showManageToast('新增失敗', 'error');
+                console.error(error);
+            } else {
                     locNameInput.value = '';
-                    renderLocationsList();
-                    alert('新增成功');
-                }
-            });
-
-            renderLocationsList();
+                renderLocationsList();
+                showManageToast('新增成功', 'success');
+            }
         });
+
+                renderLocationsList();
+    });
 
     document.getElementById('logout-btn').addEventListener('click', function () {
         localStorage.removeItem('profile');
